@@ -1,0 +1,281 @@
+const test = require('brittle')
+const fs = require('node:fs')
+const path = require('node:path')
+const vm = require('node:vm')
+const { spawnSync } = require('node:child_process')
+const { testnet } = require('./helpers/net')
+const { parseArgs, HELP, UsageError } = require('../lib/cli')
+
+const root = path.resolve(__dirname, '..')
+const bin = path.join(root, 'bin/somos.js')
+const upperKey = 'ABCDEF01'.repeat(8)
+const lowerKey = upperKey.toLowerCase()
+const expectedHelp = `somos — protótipo de rede social P2P (fase 0)
+Uso: node bin/somos.js <comando> [subcomando] [opções]
+Comandos:
+  assoc init|show|certify    chave da associação de teste e certificados de membro
+  assoc certify-seeder       certifica a chave de um semeador (--seeder)
+  id create|show             identidade (chave pública do diário)
+  cert add                   grava o certificado como bloco 0 do diário
+  profile set                define nome e bio
+  post                       publica um texto (--text)
+  reply                      responde a uma publicação (--to <chave>:<seq> --text)
+  follow|unfollow|follows    segue ou deixa de seguir uma chave pública
+  log                        mostra os blocos locais de um diário
+  feed                       feed com as publicações dos diários seguidos
+  sync                       sincroniza com pares e com o semeador (--once, --timeout-ms)
+  seed                       semeador sempre ligado
+  seed key|cert add          chave do semeador e seu certificado (--cert-file)
+  help                       esta ajuda
+Opções globais:
+  --data <dir>               diretório de dados (ou SOMOS_DATA, padrão ./data)
+  --association <hex>        chave pública da associação (ou SOMOS_ASSOCIATION)
+  --bootstrap <host:porta>   repetível (ou SOMOS_BOOTSTRAP, separado por vírgula)
+  --dht-host <ip>            endereço local da DHT (ou SOMOS_DHT_HOST)
+  --json                     saída JSON na última linha
+Opções dos comandos:
+  --member --seeder --age-band --method --out --cert-file --name --bio --text
+  --to --author --limit --once --timeout-ms`
+
+function parse (argv = [], env = {}) {
+  return parseArgs(argv, env, root)
+}
+
+function usage (t, argv, message, env = {}) {
+  let error
+  try {
+    parse(argv, env)
+  } catch (err) {
+    error = err
+  }
+  t.ok(error instanceof Error && error instanceof UsageError, JSON.stringify(argv) + ' throws UsageError')
+  t.is(error && error.code, 'USAGE')
+  if (message) t.is(error && error.message, message)
+}
+
+function spawn (argv, extraEnv = {}) {
+  const env = { ...process.env }
+  for (const name of ['SOMOS_DATA', 'SOMOS_ASSOCIATION', 'SOMOS_BOOTSTRAP', 'SOMOS_DHT_HOST']) delete env[name]
+  return spawnSync(process.execPath, [bin, ...argv], {
+    cwd: root,
+    env: { ...env, ...extraEnv },
+    encoding: 'utf8',
+    timeout: 10000
+  })
+}
+
+// Exercise command dispatch without creating modules owned by later tasks.
+async function route (modules) {
+  const state = { stdout: '', stderr: '', timers: [] }
+  const processStub = {
+    argv: [process.execPath, bin, 'fixture', 'arg', '--json'],
+    exitCode: undefined,
+    stdout: { write: text => { state.stdout += text } },
+    stderr: { write: text => { state.stderr += text } },
+    exit: code => { state.forcedCode = code }
+  }
+  vm.runInNewContext(fs.readFileSync(bin, 'utf8'), {
+    __dirname: path.dirname(bin),
+    process: processStub,
+    require: name => {
+      if (name === 'node:fs') return { readdirSync: () => Object.keys(modules) }
+      if (name === 'node:path') return path
+      if (name === '../lib/cli') return { HELP, parseArgs: argv => parse(argv) }
+      return modules[path.basename(name)]
+    },
+    setTimeout: (callback, delay) => {
+      const timer = { callback, delay, unreferenced: false }
+      state.timers.push(timer)
+      return { unref: () => { timer.unreferenced = true } }
+    }
+  }, { filename: bin })
+  await new Promise(resolve => setImmediate(resolve))
+  return { ...state, process: processStub }
+}
+
+test('CLI parser, R5 help and command router', async (t) => {
+  t.timeout(60000)
+  await testnet(t)
+
+  t.is(HELP, expectedHelp)
+  t.alike(parse(), {
+    command: null,
+    positionals: [],
+    help: false,
+    json: false,
+    once: false,
+    dataDir: path.join(root, 'data'),
+    association: null,
+    bootstrap: undefined,
+    timeoutMs: null,
+    member: null,
+    seeder: null,
+    dhtHost: null,
+    ageBand: null,
+    method: null,
+    out: null,
+    certFile: null,
+    name: null,
+    bio: null,
+    text: null,
+    to: null,
+    author: null,
+    limit: null,
+    cwd: root
+  })
+  t.alike(parseArgs([]), parseArgs([], process.env, process.cwd()), 'default env and cwd')
+  t.alike(parse(['--json', 'seed', 'cert', '--once', 'add']).positionals, ['cert', 'add'])
+  for (const [command, positionals] of [['seed', ['key']], ['seed', ['cert', 'add']], ['assoc', ['certify-seeder']]]) {
+    const flags = parse([command, ...positionals])
+    t.is(flags.command, command)
+    t.alike(flags.positionals, positionals)
+  }
+  for (const flag of ['--help', '-h']) t.is(parse([flag]).help, true)
+  t.is(parse(['--json', '--json']).json, true)
+  t.is(parse(['--once']).once, true)
+
+  const strings = {
+    data: ['relative', 'dataDir', path.join(root, 'relative')],
+    association: [upperKey, 'association', lowerKey],
+    'timeout-ms': ['12', 'timeoutMs', 12],
+    member: [upperKey, 'member', lowerKey],
+    seeder: [upperKey, 'seeder', lowerKey],
+    'age-band': ['18+', 'ageBand', '18+'],
+    method: ['stub', 'method', 'stub'],
+    out: ['cert.json', 'out', path.join(root, 'cert.json')],
+    'cert-file': ['input.json', 'certFile', path.join(root, 'input.json')],
+    name: ['Ana', 'name', 'Ana'],
+    bio: ['uma bio', 'bio', 'uma bio'],
+    text: ['olá mundo', 'text', 'olá mundo'],
+    to: [upperKey + ':2', 'to', { author: lowerKey, seq: 2 }],
+    author: [upperKey, 'author', lowerKey],
+    limit: ['3', 'limit', 3],
+    'dht-host': ['127.0.0.1', 'dhtHost', '127.0.0.1']
+  }
+  for (const [name, [value, property, expected]] of Object.entries(strings)) {
+    const flag = '--' + name
+    t.alike(parse([flag, 'discarded', flag, value])[property], expected, flag + ' last wins')
+    usage(t, [flag], 'falta o valor de ' + flag)
+    usage(t, [flag + '=' + value], 'opção desconhecida ' + flag + '=' + value)
+  }
+  const dashed = parse(['post', '--text', '-1', '--name', '-x', '--json'])
+  t.is(dashed.command, 'post')
+  t.is(dashed.text, '-1')
+  t.is(dashed.name, '-x')
+  t.is(dashed.json, true)
+  usage(t, ['--timeout-ms', '-1'], 'timeout-ms inválido')
+  usage(t, ['--member', '-1'], 'chave inválida')
+  usage(t, ['post', '--name', 'Ana', '--text'], 'falta o valor de --text')
+  for (const flag of ['--bogus', '-x', '--', '--json=true', '--once=false', '--help=true', '--bootstrap=host:1']) {
+    usage(t, [flag], 'opção desconhecida ' + flag)
+  }
+  t.is(parse(['--bio', '']).bio, '')
+  t.is(parse(['--data', root]).dataDir, root)
+  t.is(parse(['--out', root]).out, root)
+  t.is(parse(['--cert-file', root]).certFile, root)
+  t.is(parse([], { SOMOS_DATA: 'env-data' }).dataDir, path.join(root, 'env-data'))
+  t.is(parse(['--data', 'flag-data'], { SOMOS_DATA: 'env-data' }).dataDir, path.join(root, 'flag-data'))
+  t.is(parse(['--data', ''], { SOMOS_DATA: 'env-data' }).dataDir, path.join(root, 'env-data'))
+  t.is(parse([], { SOMOS_ASSOCIATION: upperKey }).association, lowerKey)
+  t.is(parse(['--association', upperKey], { SOMOS_ASSOCIATION: 'invalid' }).association, lowerKey)
+  usage(t, [], 'chave da associação inválida', { SOMOS_ASSOCIATION: 'invalid' })
+  for (const invalid of ['', 'g'.repeat(64), 'a'.repeat(63), 'a'.repeat(65), upperKey + '\n']) {
+    for (const name of ['member', 'author', 'seeder']) usage(t, ['--' + name, invalid], 'chave inválida')
+    if (invalid) usage(t, ['--association', invalid], 'chave da associação inválida')
+  }
+
+  t.alike(parse(['--bootstrap', 'host:1', '--bootstrap', '127.0.0.1:65535', '--bootstrap', 'host:1'], {
+    SOMOS_BOOTSTRAP: 'invalid'
+  }).bootstrap, ['host:1', '127.0.0.1:65535', 'host:1'])
+  t.alike(parse(['--bootstrap', '10.0.0.1:1000,10.0.0.2:1000'], {
+    SOMOS_BOOTSTRAP: 'invalid'
+  }).bootstrap, ['10.0.0.1:1000', '10.0.0.2:1000'])
+  t.alike(parse(['--bootstrap', ' 10.0.0.1:1000, , 10.0.0.2:1000 , ']).bootstrap, ['10.0.0.1:1000', '10.0.0.2:1000'])
+  t.alike(parse([], { SOMOS_BOOTSTRAP: ' host:1, , localhost:65535, ' }).bootstrap, ['host:1', 'localhost:65535'])
+  t.alike(parse([], { SOMOS_BOOTSTRAP: '10.0.0.1:1000,10.0.0.2:1000' }).bootstrap, ['10.0.0.1:1000', '10.0.0.2:1000'])
+  // A present but empty bootstrap source never falls back to the public DHT.
+  usage(t, [], 'bootstrap inválido (vazio)', { SOMOS_BOOTSTRAP: ' , , ' })
+  usage(t, [], 'bootstrap inválido (vazio)', { SOMOS_BOOTSTRAP: '' })
+  usage(t, ['--bootstrap', ''], 'bootstrap inválido (vazio)', { SOMOS_BOOTSTRAP: 'good:1' })
+  usage(t, ['--bootstrap', ' , , '], 'bootstrap inválido (vazio)', { SOMOS_BOOTSTRAP: 'good:1' })
+  t.is(parse([], {}).bootstrap, undefined)
+  t.alike(parse(['--bootstrap', 'host:1\n'], { SOMOS_BOOTSTRAP: 'bad' }).bootstrap, ['host:1'])
+  usage(t, ['--bootstrap'], 'falta o valor de --bootstrap')
+  usage(t, ['--bootstrap', '--json'], 'bootstrap inválido --json')
+  for (const entry of [
+    'host', ':1', 'host:', 'host:0', 'host:65536', 'host:1.5', 'host:-1', 'host:abc', 'host:1e2', 'host name:1',
+    '127.0.0.1:1:65535', '::1', '[::1]:4001', '10.0.0.1:0', '10.0.0.1:65536', 'host:080'
+  ]) {
+    usage(t, ['--bootstrap', entry], 'bootstrap inválido ' + entry, { SOMOS_BOOTSTRAP: 'good:1' })
+    usage(t, [], 'bootstrap inválido ' + entry, { SOMOS_BOOTSTRAP: 'good:1,' + entry })
+  }
+  usage(t, ['--bootstrap', 'good:1', '--bootstrap', 'bad'], 'bootstrap inválido bad')
+  usage(t, ['--bootstrap', '10.0.0.1:1000,host:080'], 'bootstrap inválido host:080')
+
+  t.is(parse([], { SOMOS_DHT_HOST: '127.0.0.1' }).dhtHost, '127.0.0.1')
+  t.is(parse(['--dht-host', '::1'], { SOMOS_DHT_HOST: 'invalid host' }).dhtHost, '::1')
+  for (const host of ['', ' ', '127.0.0.1 ', 'local host', 'local\thost', 'local\nhost']) {
+    usage(t, ['--dht-host', host], 'dht-host inválido')
+    usage(t, [], 'dht-host inválido', { SOMOS_DHT_HOST: host })
+  }
+  for (const name of ['timeout-ms', 'limit']) {
+    for (const value of ['0', '-1', '1.5', 'abc', '', 'Infinity', '1e3', '0x10']) usage(t, ['--' + name, value])
+  }
+  usage(t, ['--to', upperKey + ':0'], 'referência inválida')
+  for (const ref of [
+    '', upperKey, upperKey + ':', upperKey + ':00', upperKey + ':02', upperKey + ':-1',
+    upperKey + ':1.5', upperKey + ':1:2', upperKey + ':9007199254740992',
+    upperKey + ':9007199254740993', 'bad:1', upperKey + ': 1'
+  ]) {
+    usage(t, ['--to', ref], 'referência inválida')
+  }
+  t.alike(parse(['--to', upperKey + ':9007199254740991']).to, { author: lowerKey, seq: 9007199254740991 })
+
+  for (const args of [['help'], [], ['--help'], ['-h'], ['nope', '--help']]) {
+    const result = spawn(args)
+    t.is(result.status, 0)
+    t.is(result.stdout, HELP + '\n')
+    t.ok(result.stdout.includes('assoc') && result.stdout.includes('seed'))
+    t.is(result.stderr, '')
+  }
+  const unknown = spawn(['nope'])
+  t.is(unknown.status, 2)
+  t.is(unknown.stderr, 'erro: comando desconhecido: nope\n')
+  t.is(unknown.stdout, '')
+  const bogus = spawn(['--bogus'])
+  t.is(bogus.status, 2)
+  t.is(bogus.stderr, 'uso: opção desconhecida --bogus\n' + HELP + '\n')
+  t.is(bogus.stdout, '')
+  const invalidEnv = spawn(['help'], { SOMOS_BOOTSTRAP: 'invalid' })
+  t.is(invalidEnv.status, 2)
+  t.is(invalidEnv.stderr, 'uso: bootstrap inválido invalid\n' + HELP + '\n')
+
+  for (const code of [undefined, 0, 7]) {
+    let received
+    const result = await route({
+      'a.js': { commands: { unrelated: { run: () => { throw new Error('wrong command') } } } },
+      'b.js': { commands: { fixture: { summary: 'fixture', run: async flags => { received = flags; return code } } } },
+      'ignored.txt': null
+    })
+    t.is(result.process.exitCode, code === undefined ? 0 : code)
+    t.alike(received, parse(['fixture', 'arg', '--json']))
+    t.is(result.stderr, '')
+    t.is(result.timers.length, 1)
+    t.is(result.timers[0].delay, 2000)
+    t.is(result.timers[0].unreferenced, true)
+  }
+  for (const [error, code, prefix] of [[new UsageError('argumento inválido'), 2, 'uso: '], [new Error('falhou'), 1, 'erro: ']]) {
+    const result = await route({ 'fixture.js': { commands: { fixture: { run: async () => { throw error } } } } })
+    t.is(result.process.exitCode, code)
+    t.is(result.stderr, prefix + error.message + '\n')
+    t.is(result.timers.length, 1)
+    t.is(result.timers[0].delay, 2000)
+    t.is(result.timers[0].unreferenced, true)
+  }
+  const duplicate = await route({
+    'a.js': { commands: { fixture: {} } },
+    'b.js': { commands: { fixture: {} } }
+  })
+  t.is(duplicate.process.exitCode, 1)
+  t.is(duplicate.stderr, 'erro: comando duplicado: fixture\n')
+})
