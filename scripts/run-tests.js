@@ -1,10 +1,10 @@
 // Runs brittle test files one per child process, sequentially.
 // Each child is spawned detached so it leads its own process group; on
-// timeout (SOMOS_TEST_TIMEOUT_MS, default 180000) or on the runner's own
+// timeout (VARANDA_TEST_TIMEOUT_MS, default 180000) or on the runner's own
 // SIGINT/SIGTERM the whole group is killed with SIGKILL, so grandchildren
 // spawned by a test never outlive it (process groups are POSIX only).
-// Each file gets its own temp root (SOMOS_TEST_TMPDIR, under os.tmpdir(),
-// prefix 'somos-run-') that the runner removes after the child exits for
+// Each file gets its own temp root (VARANDA_TEST_TMPDIR, under os.tmpdir(),
+// prefix 'varanda-run-') that the runner removes after the child exits for
 // any reason, so a SIGKILLed test (no 'exit' handler runs) leaves nothing.
 const fs = require('node:fs')
 const os = require('node:os')
@@ -29,7 +29,7 @@ if (files.length === 0) {
 
 // Only a finite positive value is accepted: setTimeout throws on Infinity or
 // negative delays, which would crash the runner after a detached spawn.
-const requested = Number(process.env.SOMOS_TEST_TIMEOUT_MS)
+const requested = Number(process.env.VARANDA_TEST_TIMEOUT_MS)
 const timeout = Number.isFinite(requested) && requested > 0 && requested <= 2147483647 ? requested : 180000
 let current = null
 let currentRoot = null
@@ -59,8 +59,8 @@ onSignal('SIGTERM', 143)
 // Resolves true when the file passed.
 function runFile (file) {
   return new Promise((resolve) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'somos-run-'))
-    const env = { ...process.env, SOMOS_TEST_TMPDIR: root }
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'varanda-run-'))
+    const env = { ...process.env, VARANDA_TEST_TMPDIR: root }
     currentRoot = root
     const child = spawn(process.execPath, [file], { stdio: 'inherit', detached: true, env })
     current = child

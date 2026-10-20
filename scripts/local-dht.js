@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Local DHT bootstrap node for manual tests on one machine without internet:
 //   node scripts/local-dht.js [--port 49737]
-// Prints the SOMOS_BOOTSTRAP export line and runs until SIGINT/SIGTERM.
+// Prints the VARANDA_BOOTSTRAP export line and runs until SIGINT/SIGTERM.
 // HyperDHT.bootstrapper requires an IPv4 host and rejects 0.0.0.0, so the
-// node binds 127.0.0.1 only; point every somos process at it with
-// SOMOS_BOOTSTRAP and SOMOS_DHT_HOST=127.0.0.1.
+// node binds 127.0.0.1 only; point every varanda process at it with
+// VARANDA_BOOTSTRAP and VARANDA_DHT_HOST=127.0.0.1.
 const HyperDHT = require('hyperdht')
 
 const DEFAULT_PORT = 49737
@@ -25,7 +25,7 @@ async function main () {
   const node = HyperDHT.bootstrapper(port, HOST)
   await node.ready()
   const bound = node.address().port
-  process.stdout.write('export SOMOS_BOOTSTRAP=' + HOST + ':' + bound + '\n')
+  process.stdout.write('export VARANDA_BOOTSTRAP=' + HOST + ':' + bound + '\n')
   process.stderr.write('DHT local em ' + HOST + ':' + bound + ' (Ctrl-C para encerrar)\n')
   await new Promise((resolve) => {
     process.once('SIGINT', resolve)

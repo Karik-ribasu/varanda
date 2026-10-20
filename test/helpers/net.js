@@ -12,7 +12,7 @@
 // tmpDir records every directory in a module-level Set and a single
 // process 'exit' handler removes whatever is still there, because brittle's
 // t.timeout path runs no teardown at all; the teardown removes the entry it
-// cleans. Directories are created under SOMOS_TEST_TMPDIR when the runner
+// cleans. Directories are created under VARANDA_TEST_TMPDIR when the runner
 // sets it (a per-file root it removes after the child exits, even after a
 // SIGKILL where no 'exit' handler runs), else under os.tmpdir(); the exit
 // handler and the teardowns cover a file run alone with node test/<file>.
@@ -46,8 +46,8 @@ function removeTmpDirsSync () {
   }
 }
 
-function tmpDir (t, prefix = 'somos-') {
-  const base = process.env.SOMOS_TEST_TMPDIR || os.tmpdir()
+function tmpDir (t, prefix = 'varanda-') {
+  const base = process.env.VARANDA_TEST_TMPDIR || os.tmpdir()
   const dir = fs.mkdtempSync(path.join(base, prefix))
   tmpDirs.add(dir)
   if (!exitHandlerArmed) {

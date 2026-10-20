@@ -12,21 +12,21 @@ const { verifySeederCert, verifyCert } = require('../lib/cert')
 const { openStore, openDiary, appendRecord } = require('../lib/store')
 const { postRecord } = require('../lib/records')
 
-const BIN = path.join(__dirname, '..', 'bin', 'somos.js')
+const BIN = path.join(__dirname, '..', 'bin', 'varanda.js')
 const HEX64 = /^[0-9a-f]{64}$/
 
 const env = {}
-for (const [k, v] of Object.entries(process.env)) if (!k.startsWith('SOMOS_')) env[k] = v
+for (const [k, v] of Object.entries(process.env)) if (!k.startsWith('VARANDA_')) env[k] = v
 
 const outputs = []
 
-function somos (dataDir, args) {
+function varanda (dataDir, args) {
   const r = spawnSync(process.execPath, [BIN, ...args, '--data', dataDir], { env, encoding: 'utf8', timeout: 60000 })
   outputs.push(r.stdout)
   return { code: r.status, stdout: r.stdout, stderr: r.stderr }
 }
 
-function somosAsync (dataDir, args) {
+function varandaAsync (dataDir, args) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [BIN, ...args, '--data', dataDir], { env })
     let stdout = ''
@@ -56,20 +56,20 @@ test('assoc commands', async (t) => {
   const dir = tmpDir(t)
   const dir2 = tmpDir(t)
 
-  const init = somos(dir, ['assoc', 'init', '--json'])
+  const init = varanda(dir, ['assoc', 'init', '--json'])
   t.is(init.code, 0)
   const pub = lastJson(init).publicKey
   t.ok(HEX64.test(pub), 'public key is hex64')
-  t.is(somos(dir, ['assoc', 'init']).code, 1, 'second init fails')
-  t.is(lastJson(somos(dir, ['assoc', 'show', '--json'])).publicKey, pub, 'show returns the same key')
-  t.is(somos(dir, ['assoc', 'show']).stdout.trim(), 'chave pública da associação: ' + pub)
-  t.is(somos(dir, ['assoc', 'certify']).code, 2, 'certify without --member is a usage error')
-  t.is(somos(dir, ['assoc', 'bogus']).code, 2, 'unknown subcommand is a usage error')
+  t.is(varanda(dir, ['assoc', 'init']).code, 1, 'second init fails')
+  t.is(lastJson(varanda(dir, ['assoc', 'show', '--json'])).publicKey, pub, 'show returns the same key')
+  t.is(varanda(dir, ['assoc', 'show']).stdout.trim(), 'chave pública da associação: ' + pub)
+  t.is(varanda(dir, ['assoc', 'certify']).code, 2, 'certify without --member is a usage error')
+  t.is(varanda(dir, ['assoc', 'bogus']).code, 2, 'unknown subcommand is a usage error')
 
   // certify-seeder (R5.2 f)
   const seeder = crypto.randomBytes(32).toString('hex')
   const out = path.join(dir2, 'seeder-cert.json')
-  const r = somos(dir, ['assoc', 'certify-seeder', '--seeder', seeder, '--out', out, '--json'])
+  const r = varanda(dir, ['assoc', 'certify-seeder', '--seeder', seeder, '--out', out, '--json'])
   t.is(r.code, 0)
   t.is(lastJson(r).out, out)
   const cert = JSON.parse(fs.readFileSync(out, 'utf8'))
@@ -81,8 +81,8 @@ test('assoc commands', async (t) => {
   const row = JSON.parse(lines[0])
   t.alike(Object.keys(row).sort(), ['date', 'seeder'])
   t.is(row.seeder, seeder)
-  t.is(somos(dir, ['assoc', 'certify-seeder']).code, 2, 'certify-seeder without --seeder is a usage error')
-  const plain = somos(dir, ['assoc', 'certify-seeder', '--seeder', seeder])
+  t.is(varanda(dir, ['assoc', 'certify-seeder']).code, 2, 'certify-seeder without --seeder is a usage error')
+  const plain = varanda(dir, ['assoc', 'certify-seeder', '--seeder', seeder])
   t.is(plain.code, 0)
   t.is(JSON.parse(plain.stdout.trim().split('\n')[0]).seeder, seeder, 'without --out prints the cert')
 
@@ -98,103 +98,103 @@ test('member commands', async (t) => {
   const bDir = tmpDir(t)
   const files = tmpDir(t)
 
-  const pub = lastJson(somos(assocDir, ['assoc', 'init', '--json'])).publicKey
-  const pub2 = lastJson(somos(assoc2Dir, ['assoc', 'init', '--json'])).publicKey
+  const pub = lastJson(varanda(assocDir, ['assoc', 'init', '--json'])).publicKey
+  const pub2 = lastJson(varanda(assoc2Dir, ['assoc', 'init', '--json'])).publicKey
 
   // identity
-  t.is(somos(aDir, ['id', 'create']).code, 2, 'id create without --association is a usage error')
-  t.is(somos(aDir, ['id', 'show']).code, 1, 'id show without identity fails')
-  const created = somos(aDir, ['id', 'create', '--association', pub, '--json'])
+  t.is(varanda(aDir, ['id', 'create']).code, 2, 'id create without --association is a usage error')
+  t.is(varanda(aDir, ['id', 'show']).code, 1, 'id show without identity fails')
+  const created = varanda(aDir, ['id', 'create', '--association', pub, '--json'])
   t.is(created.code, 0)
   const A = lastJson(created).publicKey
   t.ok(HEX64.test(A))
   t.is(lastJson(created).association, pub)
-  t.is(lastJson(somos(aDir, ['id', 'create', '--association', pub, '--json'])).publicKey, A, 'idempotent')
-  t.is(lastJson(somos(aDir, ['id', 'create', '--json'])).publicKey, A, 'association optional later')
-  t.is(somos(aDir, ['id', 'create', '--association', pub2]).code, 1, 'another association is an error')
-  t.is(lastJson(somos(aDir, ['id', 'show', '--json'])).publicKey, A)
-  t.is(somos(aDir, ['id', 'bogus']).code, 2)
-  const B = lastJson(somos(bDir, ['id', 'create', '--association', pub, '--json'])).publicKey
+  t.is(lastJson(varanda(aDir, ['id', 'create', '--association', pub, '--json'])).publicKey, A, 'idempotent')
+  t.is(lastJson(varanda(aDir, ['id', 'create', '--json'])).publicKey, A, 'association optional later')
+  t.is(varanda(aDir, ['id', 'create', '--association', pub2]).code, 1, 'another association is an error')
+  t.is(lastJson(varanda(aDir, ['id', 'show', '--json'])).publicKey, A)
+  t.is(varanda(aDir, ['id', 'bogus']).code, 2)
+  const B = lastJson(varanda(bDir, ['id', 'create', '--association', pub, '--json'])).publicKey
 
   // publishing before the certificate
-  const early = somos(aDir, ['profile', 'set', '--name', 'Ana'])
+  const early = varanda(aDir, ['profile', 'set', '--name', 'Ana'])
   t.is(early.code, 1)
   t.ok(early.stderr.includes('grave o certificado'), 'genesis-required message')
-  t.is(somos(aDir, ['profile', 'set']).code, 2, 'profile set needs --name')
-  t.is(somos(aDir, ['post']).code, 2, 'post needs --text')
-  t.is(somos(aDir, ['reply', '--text', 'x']).code, 2, 'reply needs --to')
+  t.is(varanda(aDir, ['profile', 'set']).code, 2, 'profile set needs --name')
+  t.is(varanda(aDir, ['post']).code, 2, 'post needs --text')
+  t.is(varanda(aDir, ['reply', '--text', 'x']).code, 2, 'reply needs --to')
 
   // certificates
   const certFile = path.join(files, 'a.json')
-  t.is(somos(assocDir, ['assoc', 'certify', '--member', A, '--out', certFile]).code, 0)
+  t.is(varanda(assocDir, ['assoc', 'certify', '--member', A, '--out', certFile]).code, 0)
   const certB = path.join(files, 'b.json')
-  somos(assocDir, ['assoc', 'certify', '--member', B, '--out', certB])
+  varanda(assocDir, ['assoc', 'certify', '--member', B, '--out', certB])
   const certOther = path.join(files, 'other.json')
-  somos(assoc2Dir, ['assoc', 'certify', '--member', A, '--out', certOther])
+  varanda(assoc2Dir, ['assoc', 'certify', '--member', A, '--out', certOther])
 
-  t.is(somos(aDir, ['cert', 'add']).code, 2, 'cert add needs --cert-file')
-  const wrongKey = somos(aDir, ['cert', 'add', '--cert-file', certB])
+  t.is(varanda(aDir, ['cert', 'add']).code, 2, 'cert add needs --cert-file')
+  const wrongKey = varanda(aDir, ['cert', 'add', '--cert-file', certB])
   t.is(wrongKey.code, 1)
   t.ok(wrongKey.stderr.includes('member-mismatch'))
-  const untrusted = somos(aDir, ['cert', 'add', '--cert-file', certOther])
+  const untrusted = varanda(aDir, ['cert', 'add', '--cert-file', certOther])
   t.is(untrusted.code, 1)
   t.ok(untrusted.stderr.includes('untrusted-association'))
-  const added = somos(aDir, ['cert', 'add', '--cert-file', certFile, '--json'])
+  const added = varanda(aDir, ['cert', 'add', '--cert-file', certFile, '--json'])
   t.is(added.code, 0)
   t.alike(lastJson(added), { seq: 0 })
-  t.is(somos(aDir, ['cert', 'add', '--cert-file', certFile]).code, 0, 'identical cert is ok again')
-  t.is(somos(aDir, ['cert', 'bogus']).code, 2)
+  t.is(varanda(aDir, ['cert', 'add', '--cert-file', certFile]).code, 0, 'identical cert is ok again')
+  t.is(varanda(aDir, ['cert', 'bogus']).code, 2)
 
   // publishing
-  t.alike(lastJson(somos(aDir, ['profile', 'set', '--name', 'Ana', '--bio', 'oi', '--json'])), { seq: 1 })
-  const post = lastJson(somos(aDir, ['post', '--text', 'olá', '--json']))
+  t.alike(lastJson(varanda(aDir, ['profile', 'set', '--name', 'Ana', '--bio', 'oi', '--json'])), { seq: 1 })
+  const post = lastJson(varanda(aDir, ['post', '--text', 'olá', '--json']))
   t.is(post.seq, 2)
   t.is(post.ref, A + ':2')
-  t.is(somos(aDir, ['post', '--text', 'olá']).stdout.trim(), 'publicado #3')
-  const reply = lastJson(somos(aDir, ['reply', '--to', A + ':2', '--text', 'concordo', '--json']))
+  t.is(varanda(aDir, ['post', '--text', 'olá']).stdout.trim(), 'publicado #3')
+  const reply = lastJson(varanda(aDir, ['reply', '--to', A + ':2', '--text', 'concordo', '--json']))
   t.is(reply.seq, 4)
-  t.is(somos(aDir, ['reply', '--to', A + ':0', '--text', 'x']).code, 2, 'reply to block 0 is a usage error')
+  t.is(varanda(aDir, ['reply', '--to', A + ':0', '--text', 'x']).code, 2, 'reply to block 0 is a usage error')
 
-  const feed = lastJson(somos(aDir, ['feed', '--json']))
+  const feed = lastJson(varanda(aDir, ['feed', '--json']))
   const replyItem = feed.items.find((i) => i.seq === 4)
   t.alike(replyItem.replyTo, { author: A, seq: 2 })
   t.is(replyItem.name, 'Ana')
   t.alike(feed.skipped, [])
   t.alike(feed.future, [])
-  t.is(lastJson(somos(aDir, ['feed', '--limit', '1', '--json'])).items.length, 1)
-  t.ok(somos(aDir, ['feed']).stdout.includes('concordo'))
+  t.is(lastJson(varanda(aDir, ['feed', '--limit', '1', '--json'])).items.length, 1)
+  t.ok(varanda(aDir, ['feed']).stdout.includes('concordo'))
 
   // log
-  const log = lastJson(somos(aDir, ['log', '--json']))
+  const log = lastJson(varanda(aDir, ['log', '--json']))
   t.is(log.key, A)
   t.is(log.entries[0].record.type, 'member-cert')
   t.is(log.entries.length, 5)
 
   // follows
-  t.alike(lastJson(somos(aDir, ['follows', '--json'])), { follows: [] })
-  const f1 = lastJson(somos(aDir, ['follow', '--author', B, '--json']))
+  t.alike(lastJson(varanda(aDir, ['follows', '--json'])), { follows: [] })
+  const f1 = lastJson(varanda(aDir, ['follow', '--author', B, '--json']))
   t.alike(f1, { follows: [B], changed: true })
-  t.alike(lastJson(somos(aDir, ['follow', '--author', B, '--json'])), { follows: [B], changed: false })
-  t.alike(lastJson(somos(aDir, ['follows', '--json'])), { follows: [B] })
-  t.is(somos(aDir, ['follows']).stdout.trim(), B)
-  t.is(somos(aDir, ['follow', '--author', A]).code, 1, 'following self fails')
-  t.is(somos(aDir, ['follow']).code, 2)
-  t.alike(lastJson(somos(aDir, ['unfollow', '--author', B, '--json'])), { follows: [], changed: true })
-  t.alike(lastJson(somos(aDir, ['unfollow', '--author', B, '--json'])), { follows: [], changed: false })
+  t.alike(lastJson(varanda(aDir, ['follow', '--author', B, '--json'])), { follows: [B], changed: false })
+  t.alike(lastJson(varanda(aDir, ['follows', '--json'])), { follows: [B] })
+  t.is(varanda(aDir, ['follows']).stdout.trim(), B)
+  t.is(varanda(aDir, ['follow', '--author', A]).code, 1, 'following self fails')
+  t.is(varanda(aDir, ['follow']).code, 2)
+  t.alike(lastJson(varanda(aDir, ['unfollow', '--author', B, '--json'])), { follows: [], changed: true })
+  t.alike(lastJson(varanda(aDir, ['unfollow', '--author', B, '--json'])), { follows: [], changed: false })
 
   // B follows A with no local data
-  t.is(somos(bDir, ['follow', '--author', A]).code, 0)
-  const feedB = somos(bDir, ['feed', '--json'])
+  t.is(varanda(bDir, ['follow', '--author', A]).code, 0)
+  const feedB = varanda(bDir, ['feed', '--json'])
   t.is(feedB.code, 0)
   t.alike(lastJson(feedB).skipped, [{ key: A, reason: 'no-cert' }])
   t.ok(feedB.stderr.includes('aviso: diário ' + A.slice(0, 8) + ' ignorado (no-cert)'))
-  t.alike(lastJson(somos(bDir, ['feed', '--json'])).skipped, [{ key: A, reason: 'no-cert' }], 'second feed')
+  t.alike(lastJson(varanda(bDir, ['feed', '--json'])).skipped, [{ key: A, reason: 'no-cert' }], 'second feed')
   t.absent(await hasCoreFor(bDir, A), 'feed leaves no core for a key with no local data')
-  const logA = somos(bDir, ['log', '--author', A, '--json'])
+  const logA = varanda(bDir, ['log', '--author', A, '--json'])
   t.is(logA.code, 1, 'log of a key with no local data is refused')
   t.ok(logA.stderr.includes('sem dados locais'))
 
-  t.is(somos(bDir, ['unfollow', '--author', A]).code, 0)
+  t.is(varanda(bDir, ['unfollow', '--author', A]).code, 0)
   t.absent(await hasCoreFor(bDir, A), 'no orphan core after unfollow')
 
   // future-dated post (R5.10)
@@ -206,7 +206,7 @@ test('member commands', async (t) => {
   } finally {
     await store.close()
   }
-  const futureFeed = somos(aDir, ['feed', '--json'])
+  const futureFeed = varanda(aDir, ['feed', '--json'])
   const ref = A + ':5'
   const fj = lastJson(futureFeed)
   t.alike(fj.future, [ref])
@@ -224,17 +224,17 @@ test('follow refuses when follows.json already holds MAX_INVENTORY - 1 keys (ite
   await testnet(t)
   const { MAX_INVENTORY } = require('../lib/net')
   const dir = tmpDir(t)
-  t.is(somos(dir, ['id', 'create', '--association', 'c'.repeat(64)]).code, 0)
+  t.is(varanda(dir, ['id', 'create', '--association', 'c'.repeat(64)]).code, 0)
   const follows = []
   for (let i = 0; i < MAX_INVENTORY - 1; i++) follows.push(i.toString(16).padStart(64, '0'))
   fs.writeFileSync(path.join(dir, 'follows.json'), JSON.stringify({ v: 1, follows }))
-  const r = somos(dir, ['follow', '--author', 'ab'.repeat(32)])
+  const r = varanda(dir, ['follow', '--author', 'ab'.repeat(32)])
   t.is(r.code, 1)
   t.ok(r.stderr.includes('erro: limite de diários seguidos atingido'), r.stderr)
-  t.is(lastJson(somos(dir, ['follows', '--json'])).follows.length, MAX_INVENTORY - 1, 'unchanged')
-  t.is(somos(dir, ['follow', '--author', follows[0]]).code, 0, 'an already followed key is still idempotent')
-  t.is(somos(dir, ['unfollow', '--author', follows[0]]).code, 0)
-  t.is(somos(dir, ['follow', '--author', 'ab'.repeat(32)]).code, 0, 'room again after an unfollow')
+  t.is(lastJson(varanda(dir, ['follows', '--json'])).follows.length, MAX_INVENTORY - 1, 'unchanged')
+  t.is(varanda(dir, ['follow', '--author', follows[0]]).code, 0, 'an already followed key is still idempotent')
+  t.is(varanda(dir, ['unfollow', '--author', follows[0]]).code, 0)
+  t.is(varanda(dir, ['follow', '--author', 'ab'.repeat(32)]).code, 0, 'room again after an unfollow')
 })
 
 test('concurrent id create keeps one trust root', async (t) => {
@@ -242,14 +242,14 @@ test('concurrent id create keeps one trust root', async (t) => {
   const assocDir = tmpDir(t)
   const assoc2Dir = tmpDir(t)
   const dir = tmpDir(t)
-  const pub = lastJson(somos(assocDir, ['assoc', 'init', '--json'])).publicKey
-  const pub2 = lastJson(somos(assoc2Dir, ['assoc', 'init', '--json'])).publicKey
+  const pub = lastJson(varanda(assocDir, ['assoc', 'init', '--json'])).publicKey
+  const pub2 = lastJson(varanda(assoc2Dir, ['assoc', 'init', '--json'])).publicKey
 
   for (let round = 0; round < 3; round++) {
     const d = path.join(dir, 'r' + round)
     const results = await Promise.all([
-      somosAsync(d, ['id', 'create', '--association', pub, '--json']),
-      somosAsync(d, ['id', 'create', '--association', pub2, '--json'])
+      varandaAsync(d, ['id', 'create', '--association', pub, '--json']),
+      varandaAsync(d, ['id', 'create', '--association', pub2, '--json'])
     ])
     const winners = results.filter((r) => r.code === 0)
     t.is(winners.length, 1, 'exactly one id create succeeds (round ' + round + ')')
@@ -259,7 +259,7 @@ test('concurrent id create keeps one trust root', async (t) => {
     const config = JSON.parse(fs.readFileSync(path.join(d, 'config.json'), 'utf8'))
     t.is(config.association, winner, 'config.json holds the winner association')
     t.absent(fs.readdirSync(d).some((f) => f.endsWith('.tmp')), 'no temp file left')
-    t.is(lastJson(somos(d, ['id', 'show', '--json'])).association, winner)
+    t.is(lastJson(varanda(d, ['id', 'show', '--json'])).association, winner)
   }
 })
 
@@ -269,21 +269,21 @@ test('log --author and follows reject a mismatching association', async (t) => {
   const pub = 'c'.repeat(64)
   const other = 'e'.repeat(64)
   const author = 'ab'.repeat(32)
-  t.is(somos(dir, ['id', 'create', '--association', pub]).code, 0)
-  t.is(somos(dir, ['follow', '--author', author]).code, 0)
+  t.is(varanda(dir, ['id', 'create', '--association', pub]).code, 0)
+  t.is(varanda(dir, ['follow', '--author', author]).code, 0)
 
   for (const args of [['log', '--author', author], ['follows']]) {
-    const flag = somos(dir, [...args, '--association', other])
+    const flag = varanda(dir, [...args, '--association', other])
     t.is(flag.code, 1, args[0] + ' with --association of another association fails')
     t.ok(flag.stderr.includes('associação diferente da configurada'))
     const r = spawnSync(process.execPath, [BIN, ...args, '--data', dir], {
-      env: { ...env, SOMOS_ASSOCIATION: other },
+      env: { ...env, VARANDA_ASSOCIATION: other },
       encoding: 'utf8',
       timeout: 60000
     })
-    t.is(r.status, 1, args[0] + ' with SOMOS_ASSOCIATION of another association fails')
+    t.is(r.status, 1, args[0] + ' with VARANDA_ASSOCIATION of another association fails')
     t.ok(r.stderr.includes('associação diferente da configurada'))
-    const ok = somos(dir, [...args, '--association', pub])
+    const ok = varanda(dir, [...args, '--association', pub])
     if (args[0] === 'log') {
       // The association passes; the key has no local data (D).
       t.ok(ok.stderr.includes('sem dados locais'), 'log gets past the association check')
@@ -291,7 +291,7 @@ test('log --author and follows reject a mismatching association', async (t) => {
       t.is(ok.code, 0, args[0] + ' with the configured association')
     }
   }
-  t.alike(lastJson(somos(dir, ['follows', '--json'])), { follows: [author] })
+  t.alike(lastJson(varanda(dir, ['follows', '--json'])), { follows: [author] })
 })
 
 test('feed reports an empty forked replica as fork', async (t) => {
@@ -299,7 +299,7 @@ test('feed reports an empty forked replica as fork', async (t) => {
   const authorDir = tmpDir(t)
   const bDir = tmpDir(t)
   const pub = 'c'.repeat(64)
-  t.is(somos(bDir, ['id', 'create', '--association', pub]).code, 0)
+  t.is(varanda(bDir, ['id', 'create', '--association', pub]).code, 0)
 
   const certRecord = (member) => ({
     type: 'member-cert',
@@ -341,8 +341,8 @@ test('feed reports an empty forked replica as fork', async (t) => {
     await aStore.close()
   }
 
-  t.is(somos(bDir, ['follow', '--author', A]).code, 0)
-  const feed = somos(bDir, ['feed', '--json'])
+  t.is(varanda(bDir, ['follow', '--author', A]).code, 0)
+  const feed = varanda(bDir, ['feed', '--json'])
   t.is(feed.code, 0)
   t.alike(lastJson(feed).skipped, [{ key: A, reason: 'fork' }])
   t.ok(feed.stderr.includes('ignorado (fork)'))
@@ -383,14 +383,14 @@ test('publishConfig fsyncs the file and the directory and leaves no temp (B)', a
 test('feed skips own key, bad entries and duplicates in follows.json (C)', async (t) => {
   await testnet(t)
   const dir = tmpDir(t)
-  const own = lastJson(somos(dir, ['id', 'create', '--association', 'c'.repeat(64), '--json'])).publicKey
+  const own = lastJson(varanda(dir, ['id', 'create', '--association', 'c'.repeat(64), '--json'])).publicKey
   const other = 'ab'.repeat(32)
   const bad64 = 'g'.repeat(64)
   fs.writeFileSync(path.join(dir, 'follows.json'), JSON.stringify({
     v: 1,
     follows: [own, 'zz', bad64, other, other.toUpperCase(), other]
   }))
-  const r = somos(dir, ['feed', '--json'])
+  const r = varanda(dir, ['feed', '--json'])
   t.is(r.code, 0, r.stderr)
   const out = lastJson(r)
   t.alike(out.items, [])
@@ -403,9 +403,9 @@ test('feed skips own key, bad entries and duplicates in follows.json (C)', async
 test('log --author refuses a key with no local data and creates nothing (D)', async (t) => {
   await testnet(t)
   const dir = tmpDir(t)
-  t.is(somos(dir, ['id', 'create', '--association', 'c'.repeat(64)]).code, 0)
+  t.is(varanda(dir, ['id', 'create', '--association', 'c'.repeat(64)]).code, 0)
   const other = 'cd'.repeat(32)
-  const r = somos(dir, ['log', '--author', other])
+  const r = varanda(dir, ['log', '--author', other])
   t.is(r.code, 1)
   t.ok(r.stderr.includes('sem dados locais'), r.stderr)
   t.absent(await hasCoreFor(dir, other), 'no core created')
@@ -414,7 +414,7 @@ test('log --author refuses a key with no local data and creates nothing (D)', as
 test('log never prints C1, DEL or bidi controls raw (H4)', async (t) => {
   await testnet(t)
   const dir = tmpDir(t)
-  t.is(somos(dir, ['id', 'create', '--association', 'c'.repeat(64)]).code, 0)
+  t.is(varanda(dir, ['id', 'create', '--association', 'c'.repeat(64)]).code, 0)
   const hostile = 'a\u009b31m\u009d0;x\u009c\u007f\u2028\u2029\u202e\u2066z'
   const store = await openStore(dir)
   try {
@@ -425,10 +425,10 @@ test('log never prints C1, DEL or bidi controls raw (H4)', async (t) => {
   }
   const unsafe = /[\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/
   for (const args of [['log'], ['log', '--json']]) {
-    const r = somos(dir, args)
+    const r = varanda(dir, args)
     t.is(r.code, 0)
     t.absent(unsafe.test(r.stdout), args.join(' ') + ' prints no raw control')
   }
-  const entries = lastJson(somos(dir, ['log', '--json'])).entries
+  const entries = lastJson(varanda(dir, ['log', '--json'])).entries
   t.is(entries[entries.length - 1].record.text, hostile, 'escaped output parses back to the same text')
 })

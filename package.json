@@ -1,5 +1,5 @@
 {
-  "name": "somos",
+  "name": "varanda",
   "version": "0.1.0",
   "private": true,
   "description": "Protótipo fase 0 de rede social P2P (perfis, publicações, semeador)",
@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "bin": {
-    "somos": "bin/somos.js"
+    "varanda": "bin/varanda.js"
   },
   "scripts": {
     "lint": "standard",

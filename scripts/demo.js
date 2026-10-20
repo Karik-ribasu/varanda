@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 // Non-interactive phase 0 demo (npm run demo): an in-process DHT testnet on
 // 127.0.0.1 (the public DHT is never contacted), every command run through
-// bin/somos.js as a child process. Exit 0 on success ('DEMO OK'); on the first
+// bin/varanda.js as a child process. Exit 0 on success ('DEMO OK'); on the first
 // failure prints 'DEMO FALHOU: <passo>' plus the child's output and exits 1.
-// Flags: --keep (or SOMOS_DEMO_KEEP=1) keeps the data directory.
+// Flags: --keep (or VARANDA_DEMO_KEEP=1) keeps the data directory.
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { execFile, spawn } = require('node:child_process')
 
 const ROOT = path.join(__dirname, '..')
-const BIN = path.join(ROOT, 'bin', 'somos.js')
+const BIN = path.join(ROOT, 'bin', 'varanda.js')
 const WATCHDOG_MS = 150000
 const STEP_TIMEOUT_MS = 60000
 const READY_TIMEOUT_MS = 20000
@@ -18,8 +18,8 @@ const EXIT_TIMEOUT_MS = 10000
 const STRAGGLER_MS = 5000
 const SYNC_TIMEOUT_MS = 30000
 
-const keep = process.argv.includes('--keep') || process.env.SOMOS_DEMO_KEEP === '1'
-const dir = path.join(os.tmpdir(), 'somos-demo-' + process.pid)
+const keep = process.argv.includes('--keep') || process.env.VARANDA_DEMO_KEEP === '1'
+const dir = path.join(os.tmpdir(), 'varanda-demo-' + process.pid)
 const children = new Set()
 let net = null
 let env = null
@@ -79,7 +79,7 @@ function run (args) {
       } catch {}
       resolve({ code, stdout, stderr, json, killed: Boolean(err && err.killed) })
     })
-    register('somos ' + args[0], child)
+    register('varanda ' + args[0], child)
   })
 }
 
@@ -183,10 +183,10 @@ async function main () {
   say('Rede: DHT local em 127.0.0.1 (3 nós em processo); a DHT pública nunca é usada')
   net = await require('hyperdht/testnet')(3)
   const bootstrap = net.bootstrap.map((b) => '127.0.0.1:' + b.port).join(',')
-  env = { ...process.env, SOMOS_BOOTSTRAP: bootstrap, SOMOS_DHT_HOST: '127.0.0.1' }
-  delete env.SOMOS_DATA
-  delete env.SOMOS_ASSOCIATION
-  say('SOMOS_BOOTSTRAP=' + bootstrap)
+  env = { ...process.env, VARANDA_BOOTSTRAP: bootstrap, VARANDA_DHT_HOST: '127.0.0.1' }
+  delete env.VARANDA_DATA
+  delete env.VARANDA_ASSOCIATION
+  say('VARANDA_BOOTSTRAP=' + bootstrap)
 
   const assocDir = path.join(dir, 'assoc')
   const outraDir = path.join(dir, 'outra')

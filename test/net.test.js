@@ -34,7 +34,7 @@ function hex (buf) {
 // store.close so the swarm goes first. onconnection runs after the store has
 // replicated the socket.
 async function node (t, bootstrap, onconnection = () => {}) {
-  const store = new Corestore(tmpDir(t, 'somos-net-'))
+  const store = new Corestore(tmpDir(t, 'varanda-net-'))
   await store.ready()
   const swarm = createSwarm(localSwarmOptions(bootstrap))
   t.teardown(() => swarm.destroy(), { force: true })
@@ -57,7 +57,7 @@ function rawChannel (socket) {
   const received = []
   let resolveOpen
   const opened = new Promise((resolve) => { resolveOpen = resolve })
-  const channel = mux.createChannel({ protocol: 'somos/admission/1', onopen: () => resolveOpen() })
+  const channel = mux.createChannel({ protocol: 'varanda/admission/1', onopen: () => resolveOpen() })
   const message = channel.addMessage({ encoding: c.buffer, onmessage: (buf) => received.push(JSON.parse(b4a.toString(buf, 'utf8'))) })
   channel.open()
   return {
@@ -498,7 +498,7 @@ test('quarantine fetch is isolated to the offering socket', async (t) => {
 
   const socketsB = new Map()
   const b = await node(t, bootstrap, (socket) => socketsB.set(hex(socket.remotePublicKey), socket))
-  const qstoreB = new Corestore(tmpDir(t, 'somos-quarantine-'))
+  const qstoreB = new Corestore(tmpDir(t, 'varanda-quarantine-'))
   await qstoreB.ready()
   t.teardown(() => qstoreB.close(), { force: true })
 

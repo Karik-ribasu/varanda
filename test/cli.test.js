@@ -7,11 +7,11 @@ const { testnet } = require('./helpers/net')
 const { parseArgs, HELP, UsageError } = require('../lib/cli')
 
 const root = path.resolve(__dirname, '..')
-const bin = path.join(root, 'bin/somos.js')
+const bin = path.join(root, 'bin/varanda.js')
 const upperKey = 'ABCDEF01'.repeat(8)
 const lowerKey = upperKey.toLowerCase()
-const expectedHelp = `somos — protótipo de rede social P2P (fase 0)
-Uso: node bin/somos.js <comando> [subcomando] [opções]
+const expectedHelp = `varanda — protótipo de rede social P2P (fase 0)
+Uso: node bin/varanda.js <comando> [subcomando] [opções]
 Comandos:
   assoc init|show|certify    chave da associação de teste e certificados de membro
   assoc certify-seeder       certifica a chave de um semeador (--seeder)
@@ -28,10 +28,10 @@ Comandos:
   seed key|cert add          chave do semeador e seu certificado (--cert-file)
   help                       esta ajuda
 Opções globais:
-  --data <dir>               diretório de dados (ou SOMOS_DATA, padrão ./data)
-  --association <hex>        chave pública da associação (ou SOMOS_ASSOCIATION)
-  --bootstrap <host:porta>   repetível (ou SOMOS_BOOTSTRAP, separado por vírgula)
-  --dht-host <ip>            endereço local da DHT (ou SOMOS_DHT_HOST)
+  --data <dir>               diretório de dados (ou VARANDA_DATA, padrão ./data)
+  --association <hex>        chave pública da associação (ou VARANDA_ASSOCIATION)
+  --bootstrap <host:porta>   repetível (ou VARANDA_BOOTSTRAP, separado por vírgula)
+  --dht-host <ip>            endereço local da DHT (ou VARANDA_DHT_HOST)
   --json                     saída JSON na última linha
 Opções dos comandos:
   --member --seeder --age-band --method --out --cert-file --name --bio --text
@@ -55,7 +55,7 @@ function usage (t, argv, message, env = {}) {
 
 function spawn (argv, extraEnv = {}) {
   const env = { ...process.env }
-  for (const name of ['SOMOS_DATA', 'SOMOS_ASSOCIATION', 'SOMOS_BOOTSTRAP', 'SOMOS_DHT_HOST']) delete env[name]
+  for (const name of ['VARANDA_DATA', 'VARANDA_ASSOCIATION', 'VARANDA_BOOTSTRAP', 'VARANDA_DHT_HOST']) delete env[name]
   return spawnSync(process.execPath, [bin, ...argv], {
     cwd: root,
     env: { ...env, ...extraEnv },
@@ -173,50 +173,50 @@ test('CLI parser, R5 help and command router', async (t) => {
   t.is(parse(['--data', root]).dataDir, root)
   t.is(parse(['--out', root]).out, root)
   t.is(parse(['--cert-file', root]).certFile, root)
-  t.is(parse([], { SOMOS_DATA: 'env-data' }).dataDir, path.join(root, 'env-data'))
-  t.is(parse(['--data', 'flag-data'], { SOMOS_DATA: 'env-data' }).dataDir, path.join(root, 'flag-data'))
-  t.is(parse(['--data', ''], { SOMOS_DATA: 'env-data' }).dataDir, path.join(root, 'env-data'))
-  t.is(parse([], { SOMOS_ASSOCIATION: upperKey }).association, lowerKey)
-  t.is(parse(['--association', upperKey], { SOMOS_ASSOCIATION: 'invalid' }).association, lowerKey)
-  usage(t, [], 'chave da associação inválida', { SOMOS_ASSOCIATION: 'invalid' })
+  t.is(parse([], { VARANDA_DATA: 'env-data' }).dataDir, path.join(root, 'env-data'))
+  t.is(parse(['--data', 'flag-data'], { VARANDA_DATA: 'env-data' }).dataDir, path.join(root, 'flag-data'))
+  t.is(parse(['--data', ''], { VARANDA_DATA: 'env-data' }).dataDir, path.join(root, 'env-data'))
+  t.is(parse([], { VARANDA_ASSOCIATION: upperKey }).association, lowerKey)
+  t.is(parse(['--association', upperKey], { VARANDA_ASSOCIATION: 'invalid' }).association, lowerKey)
+  usage(t, [], 'chave da associação inválida', { VARANDA_ASSOCIATION: 'invalid' })
   for (const invalid of ['', 'g'.repeat(64), 'a'.repeat(63), 'a'.repeat(65), upperKey + '\n']) {
     for (const name of ['member', 'author', 'seeder']) usage(t, ['--' + name, invalid], 'chave inválida')
     if (invalid) usage(t, ['--association', invalid], 'chave da associação inválida')
   }
 
   t.alike(parse(['--bootstrap', 'host:1', '--bootstrap', '127.0.0.1:65535', '--bootstrap', 'host:1'], {
-    SOMOS_BOOTSTRAP: 'invalid'
+    VARANDA_BOOTSTRAP: 'invalid'
   }).bootstrap, ['host:1', '127.0.0.1:65535', 'host:1'])
   t.alike(parse(['--bootstrap', '10.0.0.1:1000,10.0.0.2:1000'], {
-    SOMOS_BOOTSTRAP: 'invalid'
+    VARANDA_BOOTSTRAP: 'invalid'
   }).bootstrap, ['10.0.0.1:1000', '10.0.0.2:1000'])
   t.alike(parse(['--bootstrap', ' 10.0.0.1:1000, , 10.0.0.2:1000 , ']).bootstrap, ['10.0.0.1:1000', '10.0.0.2:1000'])
-  t.alike(parse([], { SOMOS_BOOTSTRAP: ' host:1, , localhost:65535, ' }).bootstrap, ['host:1', 'localhost:65535'])
-  t.alike(parse([], { SOMOS_BOOTSTRAP: '10.0.0.1:1000,10.0.0.2:1000' }).bootstrap, ['10.0.0.1:1000', '10.0.0.2:1000'])
+  t.alike(parse([], { VARANDA_BOOTSTRAP: ' host:1, , localhost:65535, ' }).bootstrap, ['host:1', 'localhost:65535'])
+  t.alike(parse([], { VARANDA_BOOTSTRAP: '10.0.0.1:1000,10.0.0.2:1000' }).bootstrap, ['10.0.0.1:1000', '10.0.0.2:1000'])
   // A present but empty bootstrap source never falls back to the public DHT.
-  usage(t, [], 'bootstrap inválido (vazio)', { SOMOS_BOOTSTRAP: ' , , ' })
-  usage(t, [], 'bootstrap inválido (vazio)', { SOMOS_BOOTSTRAP: '' })
-  usage(t, ['--bootstrap', ''], 'bootstrap inválido (vazio)', { SOMOS_BOOTSTRAP: 'good:1' })
-  usage(t, ['--bootstrap', ' , , '], 'bootstrap inválido (vazio)', { SOMOS_BOOTSTRAP: 'good:1' })
+  usage(t, [], 'bootstrap inválido (vazio)', { VARANDA_BOOTSTRAP: ' , , ' })
+  usage(t, [], 'bootstrap inválido (vazio)', { VARANDA_BOOTSTRAP: '' })
+  usage(t, ['--bootstrap', ''], 'bootstrap inválido (vazio)', { VARANDA_BOOTSTRAP: 'good:1' })
+  usage(t, ['--bootstrap', ' , , '], 'bootstrap inválido (vazio)', { VARANDA_BOOTSTRAP: 'good:1' })
   t.is(parse([], {}).bootstrap, undefined)
-  t.alike(parse(['--bootstrap', 'host:1\n'], { SOMOS_BOOTSTRAP: 'bad' }).bootstrap, ['host:1'])
+  t.alike(parse(['--bootstrap', 'host:1\n'], { VARANDA_BOOTSTRAP: 'bad' }).bootstrap, ['host:1'])
   usage(t, ['--bootstrap'], 'falta o valor de --bootstrap')
   usage(t, ['--bootstrap', '--json'], 'bootstrap inválido --json')
   for (const entry of [
     'host', ':1', 'host:', 'host:0', 'host:65536', 'host:1.5', 'host:-1', 'host:abc', 'host:1e2', 'host name:1',
     '127.0.0.1:1:65535', '::1', '[::1]:4001', '10.0.0.1:0', '10.0.0.1:65536', 'host:080'
   ]) {
-    usage(t, ['--bootstrap', entry], 'bootstrap inválido ' + entry, { SOMOS_BOOTSTRAP: 'good:1' })
-    usage(t, [], 'bootstrap inválido ' + entry, { SOMOS_BOOTSTRAP: 'good:1,' + entry })
+    usage(t, ['--bootstrap', entry], 'bootstrap inválido ' + entry, { VARANDA_BOOTSTRAP: 'good:1' })
+    usage(t, [], 'bootstrap inválido ' + entry, { VARANDA_BOOTSTRAP: 'good:1,' + entry })
   }
   usage(t, ['--bootstrap', 'good:1', '--bootstrap', 'bad'], 'bootstrap inválido bad')
   usage(t, ['--bootstrap', '10.0.0.1:1000,host:080'], 'bootstrap inválido host:080')
 
-  t.is(parse([], { SOMOS_DHT_HOST: '127.0.0.1' }).dhtHost, '127.0.0.1')
-  t.is(parse(['--dht-host', '::1'], { SOMOS_DHT_HOST: 'invalid host' }).dhtHost, '::1')
+  t.is(parse([], { VARANDA_DHT_HOST: '127.0.0.1' }).dhtHost, '127.0.0.1')
+  t.is(parse(['--dht-host', '::1'], { VARANDA_DHT_HOST: 'invalid host' }).dhtHost, '::1')
   for (const host of ['', ' ', '127.0.0.1 ', 'local host', 'local\thost', 'local\nhost']) {
     usage(t, ['--dht-host', host], 'dht-host inválido')
-    usage(t, [], 'dht-host inválido', { SOMOS_DHT_HOST: host })
+    usage(t, [], 'dht-host inválido', { VARANDA_DHT_HOST: host })
   }
   for (const name of ['timeout-ms', 'limit']) {
     for (const value of ['0', '-1', '1.5', 'abc', '', 'Infinity', '1e3', '0x10']) usage(t, ['--' + name, value])
@@ -246,7 +246,7 @@ test('CLI parser, R5 help and command router', async (t) => {
   t.is(bogus.status, 2)
   t.is(bogus.stderr, 'uso: opção desconhecida --bogus\n' + HELP + '\n')
   t.is(bogus.stdout, '')
-  const invalidEnv = spawn(['help'], { SOMOS_BOOTSTRAP: 'invalid' })
+  const invalidEnv = spawn(['help'], { VARANDA_BOOTSTRAP: 'invalid' })
   t.is(invalidEnv.status, 2)
   t.is(invalidEnv.stderr, 'uso: bootstrap inválido invalid\n' + HELP + '\n')
 

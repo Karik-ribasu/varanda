@@ -379,7 +379,7 @@ test('two sessions of the same diary append through one queue', async (t) => {
 })
 
 function lockDir (dir) {
-  return path.join(dir, '.somos-lock')
+  return path.join(dir, '.varanda-lock')
 }
 
 function plantLock (dir, pidText) {
@@ -405,7 +405,7 @@ function age (p) {
 }
 
 function leftovers (dir) {
-  return fs.readdirSync(dir).filter((f) => f.startsWith('.somos-lock.'))
+  return fs.readdirSync(dir).filter((f) => f.startsWith('.varanda-lock.'))
 }
 
 test('data-dir lock: a held dir is LOCKED, close releases it', async (t) => {

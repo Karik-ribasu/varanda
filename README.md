@@ -1,4 +1,4 @@
-# somos
+# varanda
 
 Protótipo de fase 0 de uma rede social ponto a ponto no Holepunch (Hypercore, Hyperswarm e HyperDHT). Os comandos são um programa de terminal. A referência normativa dos formatos é [docs/protocol.md](docs/protocol.md).
 
@@ -25,10 +25,10 @@ Na raiz deste repositório:
 npm install
 ```
 
-O programa é `node bin/somos.js`. A ajuda:
+O programa é `node bin/varanda.js`. A ajuda:
 
 ```sh
-node bin/somos.js help
+node bin/varanda.js help
 ```
 
 `--help` e `-h` imprimem o mesmo texto. Os valores vão em separado: `--flag valor`. A forma `--flag=valor` é uma opção desconhecida (código 2).
@@ -37,11 +37,11 @@ node bin/somos.js help
 
 ### Ajuda
 
-`node bin/somos.js help` imprime exatamente:
+`node bin/varanda.js help` imprime exatamente:
 
 ```
-somos — protótipo de rede social P2P (fase 0)
-Uso: node bin/somos.js <comando> [subcomando] [opções]
+varanda — protótipo de rede social P2P (fase 0)
+Uso: node bin/varanda.js <comando> [subcomando] [opções]
 Comandos:
   assoc init|show|certify    chave da associação de teste e certificados de membro
   assoc certify-seeder       certifica a chave de um semeador (--seeder)
@@ -58,10 +58,10 @@ Comandos:
   seed key|cert add          chave do semeador e seu certificado (--cert-file)
   help                       esta ajuda
 Opções globais:
-  --data <dir>               diretório de dados (ou SOMOS_DATA, padrão ./data)
-  --association <hex>        chave pública da associação (ou SOMOS_ASSOCIATION)
-  --bootstrap <host:porta>   repetível (ou SOMOS_BOOTSTRAP, separado por vírgula)
-  --dht-host <ip>            endereço local da DHT (ou SOMOS_DHT_HOST)
+  --data <dir>               diretório de dados (ou VARANDA_DATA, padrão ./data)
+  --association <hex>        chave pública da associação (ou VARANDA_ASSOCIATION)
+  --bootstrap <host:porta>   repetível (ou VARANDA_BOOTSTRAP, separado por vírgula)
+  --dht-host <ip>            endereço local da DHT (ou VARANDA_DHT_HOST)
   --json                     saída JSON na última linha
 Opções dos comandos:
   --member --seeder --age-band --method --out --cert-file --name --bio --text
@@ -90,7 +90,7 @@ A associação guarda, por membro, só a chave pública, a faixa etária, o mét
 
 ### Certificado de semeador
 
-O certificado do semeador tem exatamente estas chaves: `v` (1), `seeder` (chave pública Noise, a mesma que `seed key` imprime), `date`, `association` e `signature`. O prefixo assinado é `somos-seeder-v1`, diferente de `somos-cert-v1`. Uma assinatura de membro não valida certificado de semeador, e uma assinatura de semeador não valida certificado de membro.
+O certificado do semeador tem exatamente estas chaves: `v` (1), `seeder` (chave pública Noise, a mesma que `seed key` imprime), `date`, `association` e `signature`. O prefixo assinado é `varanda-seeder-v1`, diferente de `varanda-cert-v1`. Uma assinatura de membro não valida certificado de semeador, e uma assinatura de semeador não valida certificado de membro.
 
 A associação registra em `seeders.jsonl` só a chave do semeador e a data. Sem assinatura e sem segredo.
 
@@ -104,16 +104,16 @@ No `sync`, um par só conta como semeador verificado quando o `hello` traz papel
 
 ### Tópico por associação
 
-Membros e semeadores da mesma associação se encontram num tópico de rendezvous derivado da chave pública dessa associação (`somos/rendezvous/v1:` + hex). Cada um também anuncia a chave de descoberta dos diários que guarda.
+Membros e semeadores da mesma associação se encontram num tópico de rendezvous derivado da chave pública dessa associação (`varanda/rendezvous/v1:` + hex). Cada um também anuncia a chave de descoberta dos diários que guarda.
 
 ### Raiz de confiança
 
 Cada diretório confia numa única chave pública de associação, gravada em `config.json` e imutável depois.
 
-- Membro: `id create` exige `--association <hex>` ou `SOMOS_ASSOCIATION` na primeira vez e grava `{ "v": 1, "role": "member", "association": "<hex64>" }`. Rodar de novo devolve a mesma chave pública do diário.
-- Semeador: o primeiro entre `seed key`, `seed cert add` e `seed` grava `{ "v": 1, "role": "seeder", "association": "<hex64>" }`. Sem associação nessa primeira vez o uso é `informe --association ou SOMOS_ASSOCIATION` (código 2).
+- Membro: `id create` exige `--association <hex>` ou `VARANDA_ASSOCIATION` na primeira vez e grava `{ "v": 1, "role": "member", "association": "<hex64>" }`. Rodar de novo devolve a mesma chave pública do diário.
+- Semeador: o primeiro entre `seed key`, `seed cert add` e `seed` grava `{ "v": 1, "role": "seeder", "association": "<hex64>" }`. Sem associação nessa primeira vez o uso é `informe --association ou VARANDA_ASSOCIATION` (código 2).
 
-Num comando seguinte, `--association` e `SOMOS_ASSOCIATION` são opcionais. Se vierem, têm de ser o valor já gravado. Caso contrário o erro é `associação diferente da configurada` (código 1). O nó não escolhe a raiz lendo um certificado recebido.
+Num comando seguinte, `--association` e `VARANDA_ASSOCIATION` são opcionais. Se vierem, têm de ser o valor já gravado. Caso contrário o erro é `associação diferente da configurada` (código 1). O nó não escolhe a raiz lendo um certificado recebido.
 
 `assoc show --data <dir>` e `id show --data <dir>` imprimem de novo a chave pública. `id show` sem identidade termina com `erro: identidade não encontrada`.
 
@@ -121,22 +121,22 @@ Num comando seguinte, `--association` e `SOMOS_ASSOCIATION` são opcionais. Se v
 
 | Variável | Função |
 | --- | --- |
-| `SOMOS_DATA` | Diretório de dados. Padrão `./data`. O passo a passo usa `--data` no lugar dela. |
-| `SOMOS_ASSOCIATION` | Chave pública da associação (64 hex, qualquer caixa; gravada em minúsculas). |
-| `SOMOS_BOOTSTRAP` | Nós `host:porta` separados por vírgula. Ausente, e sem `--bootstrap`, os comandos usam a DHT pública. |
-| `SOMOS_DHT_HOST` | Endereço local em que a DHT deste processo escuta. O mesmo que `--dht-host`. |
+| `VARANDA_DATA` | Diretório de dados. Padrão `./data`. O passo a passo usa `--data` no lugar dela. |
+| `VARANDA_ASSOCIATION` | Chave pública da associação (64 hex, qualquer caixa; gravada em minúsculas). |
+| `VARANDA_BOOTSTRAP` | Nós `host:porta` separados por vírgula. Ausente, e sem `--bootstrap`, os comandos usam a DHT pública. |
+| `VARANDA_DHT_HOST` | Endereço local em que a DHT deste processo escuta. O mesmo que `--dht-host`. |
 
-`--bootstrap` pode repetir. Se algum `--bootstrap` aparece na linha, ele prevalece sobre `SOMOS_BOOTSTRAP`. `--dht-host` prevalece sobre `SOMOS_DHT_HOST`.
+`--bootstrap` pode repetir. Se algum `--bootstrap` aparece na linha, ele prevalece sobre `VARANDA_BOOTSTRAP`. `--dht-host` prevalece sobre `VARANDA_DHT_HOST`.
 
-Um `SOMOS_BOOTSTRAP` vazio ou malformado é erro de uso e não cai na DHT pública. Exemplos: `uso: bootstrap inválido (vazio)`, `uso: bootstrap inválido localhost`. A porta não leva zero à esquerda; o formato é `host:porta` com porta de 1 a 65535.
+Um `VARANDA_BOOTSTRAP` vazio ou malformado é erro de uso e não cai na DHT pública. Exemplos: `uso: bootstrap inválido (vazio)`, `uso: bootstrap inválido localhost`. A porta não leva zero à esquerda; o formato é `host:porta` com porta de 1 a 65535.
 
-`SOMOS_DHT_HOST` e `--dht-host` aceitam uma string não vazia e sem espaço. Qualquer outro valor termina com `uso: dht-host inválido`.
+`VARANDA_DHT_HOST` e `--dht-host` aceitam uma string não vazia e sem espaço. Qualquer outro valor termina com `uso: dht-host inválido`.
 
-A DHT local de `scripts/local-dht.js` escuta só em `127.0.0.1`. Com ela, defina `SOMOS_DHT_HOST=127.0.0.1` ou passe `--dht-host 127.0.0.1`. Testes e `npm run demo` usam esse endereço. Sem bootstrap (DHT pública, uso manual), o endereço local é opcional e a DHT fica nos padrões da biblioteca.
+A DHT local de `scripts/local-dht.js` escuta só em `127.0.0.1`. Com ela, defina `VARANDA_DHT_HOST=127.0.0.1` ou passe `--dht-host 127.0.0.1`. Testes e `npm run demo` usam esse endereço. Sem bootstrap (DHT pública, uso manual), o endereço local é opcional e a DHT fica nos padrões da biblioteca.
 
 ### Um processo por diretório de dados
 
-`store/` é um Corestore em RocksDB e segura um lock do sistema. Antes de abri-lo, o `somos` também cria o lock `<dir>/.somos-lock` (com o pid do processo). Um segundo processo no mesmo `--data` falha com `erro: diretório de dados em uso` enquanto o primeiro não fecha o store; um lock deixado por um processo que morreu é retomado sozinho. Um lock sem pid legível só é retomado quando o diretório do lock tem mais de 10 segundos. Se `.somos-lock` não for um diretório (um arquivo ou um link simbólico), a abertura falha na hora com `erro: lock inválido (não é um diretório): <caminho>`; um link simbólico em `<dir>/store` também é recusado. Se o pid de um processo morto foi reaproveitado por outro processo seu, o lock continua em uso: confira que nenhum processo `somos` usa o diretório e apague `<dir>/.somos-lock` à mão. Comandos curtos abrem e fecham. `sync` e `seed` seguram o diretório o tempo todo em que estão rodando.
+`store/` é um Corestore em RocksDB e segura um lock do sistema. Antes de abri-lo, o `varanda` também cria o lock `<dir>/.varanda-lock` (com o pid do processo). Um segundo processo no mesmo `--data` falha com `erro: diretório de dados em uso` enquanto o primeiro não fecha o store; um lock deixado por um processo que morreu é retomado sozinho. Um lock sem pid legível só é retomado quando o diretório do lock tem mais de 10 segundos. Se `.varanda-lock` não for um diretório (um arquivo ou um link simbólico), a abertura falha na hora com `erro: lock inválido (não é um diretório): <caminho>`; um link simbólico em `<dir>/store` também é recusado. Se o pid de um processo morto foi reaproveitado por outro processo seu, o lock continua em uso: confira que nenhum processo `varanda` usa o diretório e apague `<dir>/.varanda-lock` à mão. Comandos curtos abrem e fecham. `sync` e `seed` seguram o diretório o tempo todo em que estão rodando.
 
 O store principal abre antes de `quarantine/` ser apagado. O segundo processo esbarra no lock e não apaga a quarentena de um `sync` ou `seed` que já está de pé.
 
@@ -170,21 +170,21 @@ Cada comando deve terminar com código 0 antes do próximo. A chave secreta da a
 node scripts/local-dht.js
 ```
 
-A porta padrão é 49737 (`node scripts/local-dht.js --port 49800` escolhe outra). O processo escuta só em `127.0.0.1` e imprime uma linha `export SOMOS_BOOTSTRAP=127.0.0.1:<porta>`. Ctrl-C encerra.
+A porta padrão é 49737 (`node scripts/local-dht.js --port 49800` escolhe outra). O processo escuta só em `127.0.0.1` e imprime uma linha `export VARANDA_BOOTSTRAP=127.0.0.1:<porta>`. Ctrl-C encerra.
 
 Nos outros terminais, use a linha impressa e o endereço local. Com a porta padrão:
 
 ```sh
-export SOMOS_BOOTSTRAP=127.0.0.1:49737
-export SOMOS_DHT_HOST=127.0.0.1
+export VARANDA_BOOTSTRAP=127.0.0.1:49737
+export VARANDA_DHT_HOST=127.0.0.1
 ```
 
-**DHT pública.** Não inicie `scripts/local-dht.js` e deixe `SOMOS_BOOTSTRAP` e `SOMOS_DHT_HOST` sem definir (`unset SOMOS_BOOTSTRAP SOMOS_DHT_HOST`: um `SOMOS_DHT_HOST=127.0.0.1` que sobrou da DHT local prenderia a DHT ao loopback, longe dos pares públicos). Os comandos usam a DHT pública. Não passe `--bootstrap` nem `--dht-host`. Nas linhas de `seed` e `sync` abaixo, apague `--bootstrap "$SOMOS_BOOTSTRAP" --dht-host "$SOMOS_DHT_HOST"`.
+**DHT pública.** Não inicie `scripts/local-dht.js` e deixe `VARANDA_BOOTSTRAP` e `VARANDA_DHT_HOST` sem definir (`unset VARANDA_BOOTSTRAP VARANDA_DHT_HOST`: um `VARANDA_DHT_HOST=127.0.0.1` que sobrou da DHT local prenderia a DHT ao loopback, longe dos pares públicos). Os comandos usam a DHT pública. Não passe `--bootstrap` nem `--dht-host`. Nas linhas de `seed` e `sync` abaixo, apague `--bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"`.
 
 ### 2. Associação
 
 ```sh
-line=$(node bin/somos.js assoc init --data data/assoc)
+line=$(node bin/varanda.js assoc init --data data/assoc)
 printf '%s\n' "$line"
 ASSOC=${line##* }
 ```
@@ -196,7 +196,7 @@ A linha é `chave pública da associação: ` seguida de 64 hex. `$ASSOC` é ess
 `seed key` cria `data/seeder`, grava a raiz de confiança e cria `seeder-key.json` se ele ainda não existe. Na segunda vez devolve a mesma chave pública.
 
 ```sh
-line=$(node bin/somos.js seed key --data data/seeder --association "$ASSOC")
+line=$(node bin/varanda.js seed key --data data/seeder --association "$ASSOC")
 printf '%s\n' "$line"
 SEEDER=${line##* }
 ```
@@ -205,16 +205,16 @@ A linha é `chave do semeador: ` seguida de 64 hex.
 
 ```sh
 mkdir -p data/certs
-node bin/somos.js assoc certify-seeder --data data/assoc --seeder "$SEEDER" --out data/certs/seeder.json
-node bin/somos.js seed cert add --data data/seeder --association "$ASSOC" --cert-file data/certs/seeder.json
+node bin/varanda.js assoc certify-seeder --data data/assoc --seeder "$SEEDER" --out data/certs/seeder.json
+node bin/varanda.js seed cert add --data data/seeder --association "$ASSOC" --cert-file data/certs/seeder.json
 ```
 
 A primeira imprime `certificado do semeador gravado em <caminho absoluto>`. A segunda imprime `certificado do semeador gravado`. Sem `--seeder` o uso é `uso: informe --seeder <hex>`. Sem `--cert-file` o uso é `uso: informe --cert-file <arquivo>`.
 
-Noutro terminal, com as mesmas variáveis `SOMOS_BOOTSTRAP`, `SOMOS_DHT_HOST` e `ASSOC`, deixe o semeador ligado:
+Noutro terminal, com as mesmas variáveis `VARANDA_BOOTSTRAP`, `VARANDA_DHT_HOST` e `ASSOC`, deixe o semeador ligado:
 
 ```sh
-node bin/somos.js seed --data data/seeder --association "$ASSOC" --bootstrap "$SOMOS_BOOTSTRAP" --dht-host "$SOMOS_DHT_HOST"
+node bin/varanda.js seed --data data/seeder --association "$ASSOC" --bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"
 ```
 
 Espere `seed ready`. Esse processo segura `data/seeder` até Ctrl-C, e então sai com código 0. Não rode outro comando com `--data data/seeder` enquanto ele estiver no ar.
@@ -224,11 +224,11 @@ Espere `seed ready`. Esse processo segura `data/seeder` até Ctrl-C, e então sa
 ### 4. Alice e Bob
 
 ```sh
-line=$(node bin/somos.js id create --data data/alice --association "$ASSOC")
+line=$(node bin/varanda.js id create --data data/alice --association "$ASSOC")
 printf '%s\n' "$line"
 ALICE=${line##* }
 
-line=$(node bin/somos.js id create --data data/bob --association "$ASSOC")
+line=$(node bin/varanda.js id create --data data/bob --association "$ASSOC")
 printf '%s\n' "$line"
 BOB=${line##* }
 ```
@@ -236,17 +236,17 @@ BOB=${line##* }
 Cada linha é `chave pública: ` seguida da chave do diário. Essa chave é a identidade. Repetir `id create` no mesmo diretório imprime a mesma chave.
 
 ```sh
-node bin/somos.js assoc certify --data data/assoc --member "$ALICE" --age-band '18+' --method stub --out data/certs/alice.json
-node bin/somos.js assoc certify --data data/assoc --member "$BOB" --age-band '18+' --method stub --out data/certs/bob.json
-node bin/somos.js cert add --data data/alice --cert-file data/certs/alice.json
-node bin/somos.js cert add --data data/bob --cert-file data/certs/bob.json
+node bin/varanda.js assoc certify --data data/assoc --member "$ALICE" --age-band '18+' --method stub --out data/certs/alice.json
+node bin/varanda.js assoc certify --data data/assoc --member "$BOB" --age-band '18+' --method stub --out data/certs/bob.json
+node bin/varanda.js cert add --data data/alice --cert-file data/certs/alice.json
+node bin/varanda.js cert add --data data/bob --cert-file data/certs/bob.json
 ```
 
 `cert add` imprime `certificado gravado (bloco 0)`. O certificado tem de ser desta chave e desta associação. Um certificado de outra associação falha com `certificado inválido (untrusted-association)` (código 1).
 
 ```sh
-node bin/somos.js profile set --data data/alice --name 'Alice' --bio 'protótipo'
-line=$(node bin/somos.js post --data data/alice --text 'primeira publicação')
+node bin/varanda.js profile set --data data/alice --name 'Alice' --bio 'protótipo'
+line=$(node bin/varanda.js post --data data/alice --text 'primeira publicação')
 printf '%s\n' "$line"
 SEQ=${line##*#}
 printf '%s\n' "$ALICE:$SEQ"
@@ -257,28 +257,28 @@ printf '%s\n' "$ALICE:$SEQ"
 ### 5. Alice sincroniza e sai
 
 ```sh
-node bin/somos.js sync --data data/alice --once --timeout-ms 30000 --bootstrap "$SOMOS_BOOTSTRAP" --dht-host "$SOMOS_DHT_HOST"
+node bin/varanda.js sync --data data/alice --once --timeout-ms 30000 --bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"
 ```
 
 A saída passa por `sync ready`, `peer seeder <8 hex>` e `admitted <chave da Alice> <tamanho>`, e fecha com `sync done` (código 0). O processo da Alice termina aí. O semeador permanece com a cópia.
 
 Bob recebe a publicação por esse semeador com o `sync` da Alice já encerrado. A cópia está em `data/seeder` (`admitted.json` e `store/`). Parar o semeador com Ctrl-C (código 0) e subir de novo o mesmo comando `seed`, no mesmo diretório, continua servindo o diário depois de `seed ready`. É o que a demo automática confere. Os comandos abaixo valem para o processo que já imprimiu `seed ready`, seja o original, seja o que subiu do disco.
 
-Sem par até o prazo, `sync` imprime `sync failed: sem pares` ou `sync failed: tempo esgotado: ...` e sai com código 1. Confira o terminal do semeador e o `SOMOS_BOOTSTRAP` / `--dht-host`.
+Sem par até o prazo, `sync` imprime `sync failed: sem pares` ou `sync failed: tempo esgotado: ...` e sai com código 1. Confira o terminal do semeador e o `VARANDA_BOOTSTRAP` / `--dht-host`.
 
 ### 6. Bob segue, sincroniza, lê e responde
 
 ```sh
-node bin/somos.js follow --data data/bob --author "$ALICE"
-node bin/somos.js sync --data data/bob --once --timeout-ms 30000 --bootstrap "$SOMOS_BOOTSTRAP" --dht-host "$SOMOS_DHT_HOST"
-node bin/somos.js feed --data data/bob
+node bin/varanda.js follow --data data/bob --author "$ALICE"
+node bin/varanda.js sync --data data/bob --once --timeout-ms 30000 --bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"
+node bin/varanda.js feed --data data/bob
 ```
 
 `follow` imprime `seguindo ` e a chave da Alice. O `sync` do Bob baixa o diário dela pelo semeador (`downloaded <chave da Alice> <tamanho>`) e termina com `sync done`. `feed` lista a publicação, no formato `[<data>] Alice (<8 hex>) #<seq>` e o texto na linha seguinte. `feed` não abre a rede.
 
 ```sh
-node bin/somos.js reply --data data/bob --to "$ALICE:$SEQ" --text 'também li'
-node bin/somos.js sync --data data/bob --once --timeout-ms 30000 --bootstrap "$SOMOS_BOOTSTRAP" --dht-host "$SOMOS_DHT_HOST"
+node bin/varanda.js reply --data data/bob --to "$ALICE:$SEQ" --text 'também li'
+node bin/varanda.js sync --data data/bob --once --timeout-ms 30000 --bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"
 ```
 
 `reply` imprime `publicado #<seq>`. O segundo `sync` entrega a resposta ao semeador. `--to` é `<64 hex>:<seq>` com `seq` maior ou igual a 1, sem zero à esquerda. Fora isso o uso é `referência inválida`.
@@ -291,7 +291,7 @@ Para encerrar: Ctrl-C no semeador (código 0) e Ctrl-C na DHT local.
 npm run demo
 ```
 
-O mesmo programa é `node scripts/demo.js`. Ele sobe uma DHT em processo, em `127.0.0.1` (três nós), define `SOMOS_BOOTSTRAP` e `SOMOS_DHT_HOST=127.0.0.1`, e não fala com a DHT pública. Os dados ficam num diretório temporário, apagado no fim (salvo com `--keep`).
+O mesmo programa é `node scripts/demo.js`. Ele sobe uma DHT em processo, em `127.0.0.1` (três nós), define `VARANDA_BOOTSTRAP` e `VARANDA_DHT_HOST=127.0.0.1`, e não fala com a DHT pública. Os dados ficam num diretório temporário, apagado no fim (salvo com `--keep`).
 
 O que a demo mostra, nesta ordem:
 
@@ -310,7 +310,7 @@ O que a demo mostra, nesta ordem:
 
 No sucesso o processo sai com código 0 e imprime `DEMO OK`. Na primeira falha imprime `DEMO FALHOU: <passo>` e sai com código 1.
 
-`--keep`, ou `SOMOS_DEMO_KEEP=1`, conserva o diretório temporário:
+`--keep`, ou `VARANDA_DEMO_KEEP=1`, conserva o diretório temporário:
 
 ```sh
 npm run demo -- --keep
@@ -409,7 +409,7 @@ A assinatura cobre bytes UTF-8 de linhas separadas por um único LF, sem LF no f
 Certificado de membro, seis linhas:
 
 ```
-somos-cert-v1
+varanda-cert-v1
 <member hex64>
 <faixa etária>
 <método>
@@ -420,7 +420,7 @@ somos-cert-v1
 Certificado de semeador, quatro linhas:
 
 ```
-somos-seeder-v1
+varanda-seeder-v1
 <seeder hex64>
 <data ISO>
 <association hex64>
@@ -471,4 +471,4 @@ Fora desta fase:
 | --- | --- |
 | 0 | Sucesso. `sync --once` imprime `sync done` (ou `sync done (sem confirmação de semeador)` quando nenhum semeador verificado confirmou a cópia do seu diário). `seed` e a DHT local saem com 0 depois de SIGINT ou SIGTERM. A demo imprime `DEMO OK`. |
 | 1 | Falha. Mensagem em stderr: `erro: <mensagem>`. Exemplos: `erro: certificado inválido (untrusted-association)`, `erro: certificado do semeador não encontrado (use seed cert add)`, `erro: associação diferente da configurada`. `sync` com metas não cumpridas também sai 1 e escreve `sync failed: <erros>` na saída padrão. |
-| 2 | Uso. O analisador escreve `uso: <mensagem>` e em seguida a ajuda. Exemplos: `uso: bootstrap inválido <valor>`, `uso: bootstrap inválido (vazio)`, `uso: dht-host inválido`, `uso: falta o valor de --text`, `uso: opção desconhecida <flag>`. Um comando que recusa a própria linha escreve só `uso: <mensagem>`, sem repetir a ajuda: `uso: informe --text <texto>`, `uso: informe --seeder <hex>`, `uso: informe --cert-file <arquivo>`, `uso: node bin/somos.js seed [key|cert add]`. Comando desconhecido sai 2 com `erro: comando desconhecido: <nome>`. |
+| 2 | Uso. O analisador escreve `uso: <mensagem>` e em seguida a ajuda. Exemplos: `uso: bootstrap inválido <valor>`, `uso: bootstrap inválido (vazio)`, `uso: dht-host inválido`, `uso: falta o valor de --text`, `uso: opção desconhecida <flag>`. Um comando que recusa a própria linha escreve só `uso: <mensagem>`, sem repetir a ajuda: `uso: informe --text <texto>`, `uso: informe --seeder <hex>`, `uso: informe --cert-file <arquivo>`, `uso: node bin/varanda.js seed [key|cert add]`. Comando desconhecido sai 2 com `erro: comando desconhecido: <nome>`. |

@@ -93,7 +93,7 @@ test('member certificate payload is exact', async (t) => {
   await testnet(t)
   const association = 'cd'.repeat(32)
   const c = { v: 1, member: MEMBER, ageBand: '18+', method: 'stub', date: DATE, association, signature: '' }
-  const expected = b4a.from('somos-cert-v1' + LF + MEMBER + LF + '18+' + LF + 'stub' + LF + DATE + LF + association, 'utf8')
+  const expected = b4a.from('varanda-cert-v1' + LF + MEMBER + LF + '18+' + LF + 'stub' + LF + DATE + LF + association, 'utf8')
   t.ok(b4a.equals(cert.certPayload(c), expected))
 })
 
@@ -136,7 +136,7 @@ test('seeder certificate round trip and payload', async (t) => {
 
   const association = 'cd'.repeat(32)
   const fixed = { v: 1, seeder: SEEDER, date: DATE, association, signature: '' }
-  const expected = b4a.from('somos-seeder-v1' + LF + SEEDER + LF + DATE + LF + association, 'utf8')
+  const expected = b4a.from('varanda-seeder-v1' + LF + SEEDER + LF + DATE + LF + association, 'utf8')
   t.ok(b4a.equals(cert.seederCertPayload(fixed), expected))
 
   t.exception.all(() => cert.createSeederCert({ seeder: 'abc' }, kp), TypeError)

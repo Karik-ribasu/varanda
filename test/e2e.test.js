@@ -46,11 +46,11 @@ function readAdmitted (dataDir) {
 // The seeder setup of the CLI, in-process: seed key, assoc certify-seeder,
 // seed cert add (Seeder.ensureConfig fixes the trust root on the first one).
 function prepareSeederDir (t, kp) {
-  const dataDir = tmpDir(t, 'somos-e2e-seed-')
+  const dataDir = tmpDir(t, 'varanda-e2e-seed-')
   const association = hex(kp.publicKey)
   Seeder.ensureConfig(dataDir, association)
   const { publicKey } = Seeder.createKey(dataDir)
-  const certFile = path.join(tmpDir(t, 'somos-e2e-sc-'), 'seeder-cert.json')
+  const certFile = path.join(tmpDir(t, 'varanda-e2e-sc-'), 'seeder-cert.json')
   fs.writeFileSync(certFile, JSON.stringify(createSeederCert({ seeder: publicKey }, kp), null, 2) + '\n')
   Seeder.addCert(dataDir, certFile, association)
   return { dataDir, publicKey }
@@ -67,7 +67,7 @@ async function startSeeder (t, bootstrap, dataDir, opts = {}) {
 // A member data dir: config.json (trust root = trustKp), block 0 = member
 // certificate signed by certKp, then `records`. The store is closed on return.
 async function makeMember (t, kp, records = [], { certKp = kp } = {}) {
-  const dir = tmpDir(t, 'somos-e2e-member-')
+  const dir = tmpDir(t, 'varanda-e2e-member-')
   writeConfig(dir, { v: 1, role: 'member', association: hex(kp.publicKey) })
   const store = await openStore(dir)
   try {
@@ -114,7 +114,7 @@ async function sync (bootstrap, dir) {
 // A raw member client (no lib/sync.js): its own writable core with `blocks`,
 // or a read-only core for `follow`; an admission channel per connection.
 async function rawClient (t, bootstrap, association, { blocks = null, follow = null, joinPeer = null } = {}) {
-  const store = new Corestore(tmpDir(t, 'somos-e2e-raw-'))
+  const store = new Corestore(tmpDir(t, 'varanda-e2e-raw-'))
   await store.ready()
   let core = null
   let key = null

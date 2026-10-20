@@ -12,7 +12,7 @@ const { memberCertRecord, MAX_BLOCK_BYTES } = require('../lib/records')
 const { openReplica } = require('../lib/store')
 const { discoveryKey } = require('hypercore-crypto')
 
-const BIN = path.join(__dirname, '..', 'bin', 'somos.js')
+const BIN = path.join(__dirname, '..', 'bin', 'varanda.js')
 
 function hex (buf) {
   return b4a.toString(buf, 'hex')
@@ -46,10 +46,10 @@ function readAdmitted (dataDir) {
 
 // A seeder data dir with config, Noise key pair and seeder certificate.
 function prepareSeederDir (t, assoc) {
-  const dataDir = tmpDir(t, 'somos-seed-')
+  const dataDir = tmpDir(t, 'varanda-seed-')
   Seeder.ensureConfig(dataDir, assoc.hex)
   const { publicKey } = Seeder.createKey(dataDir)
-  const certFile = path.join(tmpDir(t, 'somos-sc-'), 'seeder-cert.json')
+  const certFile = path.join(tmpDir(t, 'varanda-sc-'), 'seeder-cert.json')
   fs.writeFileSync(certFile, JSON.stringify(createSeederCert({ seeder: publicKey }, assoc.kp)))
   Seeder.addCert(dataDir, certFile, assoc.hex)
   return { dataDir, publicKey }
@@ -80,7 +80,7 @@ async function startSeeder (t, bootstrap, dataDir, opts) {
 // A raw member client: its own core (blocks(key) as JSON records, or raw
 // buffers), an admission channel per connection, and every received message.
 async function client (t, bootstrap, assoc, { blocks = null, rawBlocks = null, follow = null, joinPeer = null } = {}) {
-  const store = new Corestore(tmpDir(t, 'somos-client-'))
+  const store = new Corestore(tmpDir(t, 'varanda-client-'))
   await store.ready()
   let core = null
   let key = null
@@ -134,7 +134,7 @@ async function preload (dataDir, srcStore, key, length) {
 }
 
 async function localStore (t) {
-  const store = new Corestore(tmpDir(t, 'somos-local-'))
+  const store = new Corestore(tmpDir(t, 'varanda-local-'))
   await store.ready()
   t.teardown(() => store.close(), { force: true })
   return store
@@ -759,21 +759,21 @@ test('start errors: usage, missing key, missing cert, cert for another key', asy
   const { bootstrap } = await testnet(t)
   const assoc = makeAssociation()
 
-  const fresh = newSeeder(t, bootstrap, tmpDir(t, 'somos-seed-')).seeder
-  await t.exception(() => fresh.start(), /informe --association ou SOMOS_ASSOCIATION/)
+  const fresh = newSeeder(t, bootstrap, tmpDir(t, 'varanda-seed-')).seeder
+  await t.exception(() => fresh.start(), /informe --association ou VARANDA_ASSOCIATION/)
   let code = null
   try {
-    await new Seeder({ dataDir: tmpDir(t, 'somos-seed-') }).start()
+    await new Seeder({ dataDir: tmpDir(t, 'varanda-seed-') }).start()
   } catch (err) {
     code = err.code
   }
   t.is(code, 'USAGE')
 
-  const noKey = tmpDir(t, 'somos-seed-')
+  const noKey = tmpDir(t, 'varanda-seed-')
   Seeder.ensureConfig(noKey, assoc.hex)
   await t.exception(() => newSeeder(t, bootstrap, noKey).seeder.start(), /chave do semeador não encontrada \(use seed key\)$/)
 
-  const noCert = tmpDir(t, 'somos-seed-')
+  const noCert = tmpDir(t, 'varanda-seed-')
   Seeder.ensureConfig(noCert, assoc.hex)
   Seeder.createKey(noCert)
   await t.exception(() => newSeeder(t, bootstrap, noCert).seeder.start(), /certificado do semeador não encontrado \(use seed cert add\)$/)
@@ -782,7 +782,7 @@ test('start errors: usage, missing key, missing cert, cert for another key', asy
   const wrongCert = createSeederCert({ seeder: otherKey }, assoc.kp)
   fs.writeFileSync(path.join(noCert, 'seeder-cert.json'), JSON.stringify(wrongCert))
   await t.exception(() => newSeeder(t, bootstrap, noCert).seeder.start(), /certificado do semeador inválido \(seeder-mismatch\)$/)
-  const certFile = path.join(tmpDir(t, 'somos-sc-'), 'c.json')
+  const certFile = path.join(tmpDir(t, 'varanda-sc-'), 'c.json')
   fs.writeFileSync(certFile, JSON.stringify(wrongCert))
   t.exception(() => Seeder.addCert(noCert, certFile, assoc.hex), /seeder-mismatch/)
 
@@ -1039,7 +1039,7 @@ test('close releases the lock last: the next seeder on the data dir keeps its qu
   const { bootstrap } = await testnet(t)
   const assoc = makeAssociation()
   const { dataDir } = prepareSeederDir(t, assoc)
-  const lock = path.join(dataDir, '.somos-lock')
+  const lock = path.join(dataDir, '.varanda-lock')
   const q = path.join(dataDir, 'quarantine')
   const first = await startSeeder(t, bootstrap, dataDir, { associationKey: assoc.hex })
   t.ok(fs.existsSync(q), 'first quarantine exists')
@@ -1064,11 +1064,11 @@ test('cli: seed key and seed without association', async (t) => {
   await testnet(t)
   const assoc = makeAssociation()
   const env = { ...process.env }
-  delete env.SOMOS_ASSOCIATION
-  delete env.SOMOS_DATA
-  delete env.SOMOS_BOOTSTRAP
+  delete env.VARANDA_ASSOCIATION
+  delete env.VARANDA_DATA
+  delete env.VARANDA_BOOTSTRAP
 
-  const dir = tmpDir(t, 'somos-cli-')
+  const dir = tmpDir(t, 'varanda-cli-')
   const r1 = spawnSync(process.execPath, [BIN, 'seed', 'key', '--data', dir, '--association', assoc.hex], { env, encoding: 'utf8' })
   t.is(r1.status, 0, r1.stderr)
   const match = /chave do semeador: ([0-9a-f]{64})\n$/.exec(r1.stdout)
@@ -1078,8 +1078,8 @@ test('cli: seed key and seed without association', async (t) => {
   t.is(r2.status, 0, r2.stderr)
   t.alike(JSON.parse(r2.stdout.trim()), { publicKey: match && match[1] })
 
-  const empty = tmpDir(t, 'somos-cli-')
+  const empty = tmpDir(t, 'varanda-cli-')
   const r3 = spawnSync(process.execPath, [BIN, 'seed', '--data', empty], { env, encoding: 'utf8' })
   t.is(r3.status, 2, r3.stderr)
-  t.ok(r3.stderr.includes('informe --association ou SOMOS_ASSOCIATION'))
+  t.ok(r3.stderr.includes('informe --association ou VARANDA_ASSOCIATION'))
 })

@@ -40,7 +40,7 @@ function randomKey () {
 // A member data dir: config.json, block 0 = member cert (signed by certKp,
 // default kp), a profile and `posts` posts. The store is closed on return.
 async function makeMember (t, kp, { certKp = kp, posts = 2, trustKp = kp } = {}) {
-  const dir = tmpDir(t, 'somos-sync-')
+  const dir = tmpDir(t, 'varanda-sync-')
   const store = await openStore(dir)
   try {
     const diary = await openDiary(store)
@@ -59,7 +59,7 @@ async function makeMember (t, kp, { certKp = kp, posts = 2, trustKp = kp } = {})
 // key pair) that attaches an admission channel with the given role/cert/have
 // on every connection. onpeer(peer) runs after attach.
 async function rawNode (t, bootstrap, { keyPair, role = 'member', cert = null, have = () => [], onmessage = () => {}, onpeer = () => {} } = {}) {
-  const store = new Corestore(tmpDir(t, 'somos-raw-'))
+  const store = new Corestore(tmpDir(t, 'varanda-raw-'))
   await store.ready()
   const swarm = createSwarm({ ...localSwarmOptions(bootstrap), keyPair })
   t.teardown(() => swarm.destroy(), { force: true })
@@ -129,7 +129,7 @@ test('direct sync between two members without a seeder (first-time follower)', a
   t.timeout(120000)
   const { bootstrap } = await testnet(t)
   const kp = generateAssociationKeyPair()
-  const loops = Number(process.env.SOMOS_SYNC_LOOPS) || 1
+  const loops = Number(process.env.VARANDA_SYNC_LOOPS) || 1
   for (let i = 0; i < loops; i++) {
     const a = await makeMember(t, kp)
     const b = await makeMember(t, kp, { posts: 0 })
@@ -279,7 +279,7 @@ test('fake seeder: admission, untrusted genesis, raw untrusted announce', async 
 test('config errors', async (t) => {
   await testnet(t)
   const kp = generateAssociationKeyPair()
-  const empty = tmpDir(t, 'somos-sync-')
+  const empty = tmpDir(t, 'varanda-sync-')
   await t.exception(runSync({ dataDir: empty, once: true }), /identidade não encontrada/)
   t.absent(fs.existsSync(path.join(empty, 'store')), 'nothing opened')
   const a = await makeMember(t, kp, { posts: 0 })
@@ -547,7 +547,7 @@ test('shutdown releases the lock last: the next run on the data dir keeps its qu
   const { bootstrap } = await testnet(t)
   const kp = generateAssociationKeyPair()
   const a = await makeMember(t, kp)
-  const lock = path.join(a.dir, '.somos-lock')
+  const lock = path.join(a.dir, '.varanda-lock')
   const q = path.join(a.dir, 'quarantine')
 
   const c1 = new AbortController()
@@ -755,7 +755,7 @@ test('purges are awaited: a held purge blocks completion and a failed purge fail
 // A shared `store` (closed by its owner) avoids one Corestore per identity.
 async function hostileNode (t, bootstrap, onsocket, { store = null } = {}) {
   if (store === null) {
-    store = new Corestore(tmpDir(t, 'somos-hostile-'))
+    store = new Corestore(tmpDir(t, 'varanda-hostile-'))
     await store.ready()
     const own = store
     t.teardown(() => own.close(), { force: true })
@@ -766,7 +766,7 @@ async function hostileNode (t, bootstrap, onsocket, { store = null } = {}) {
     socket.on('error', () => {})
     store.replicate(socket)
     const mux = Hypercore.getProtocolMuxer(socket)
-    const channel = mux.createChannel({ protocol: 'somos/admission/1', onopen: () => onsocket(send) })
+    const channel = mux.createChannel({ protocol: 'varanda/admission/1', onopen: () => onsocket(send) })
     const message = channel.addMessage({ encoding: c.buffer, onmessage: () => {} })
     channel.open()
     function send (obj) { message.send(b4a.from(JSON.stringify(obj), 'utf8')) }
@@ -1044,7 +1044,7 @@ function sleep (ms) {
 // A shared Corestore for many hostile identities (each hostileNode has its
 // own swarm and Noise key pair).
 async function sharedStore (t) {
-  const store = new Corestore(tmpDir(t, 'somos-hostile-'))
+  const store = new Corestore(tmpDir(t, 'varanda-hostile-'))
   await store.ready()
   t.teardown(() => store.close(), { order: 1, force: true })
   return store
