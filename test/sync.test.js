@@ -1507,3 +1507,121 @@ test('retry item 5: a follow still in regate at the deadline is unmet even after
   t.ok(rb.errors[0].startsWith('tempo esgotado: ') && rb.errors[0].includes(author.key + ':0/'), JSON.stringify(rb.errors))
   t.absent(author.key in rb.downloaded)
 })
+
+test('review item 1: a deadline-bound fetch whose advertisers all left reports the key unadvertised', async (t) => {
+  t.timeout(60000)
+  const { bootstrap } = await testnet(t)
+  const kp = generateAssociationKeyPair()
+  const rendezvous = topicFor(hex(kp.publicKey))
+  const k = randomKey()
+  // A bystander keeps a peer in the run after the only advertiser left.
+  const bystander = await rawNode(t, bootstrap, { have: () => [] })
+  await joinAndFlush(bystander.swarm, [rendezvous])
+  // C advertises K and never serves block 0.
+  const c = await rawNode(t, bootstrap, { have: () => [{ key: k, length: 1 }] })
+  await joinAndFlush(c.swarm, [rendezvous])
+  const cKey = hex(c.swarm.keyPair.publicKey)
+  const b = await makeMember(t, kp, { posts: 0 })
+  writeFollows(b.dir, [k])
+  let left = null
+  // timeoutMs < gateTimeoutMs: the fetch for K is bound by the deadline.
+  const rb = await runSync({
+    ...localSwarmOptions(bootstrap),
+    dataDir: b.dir,
+    once: true,
+    timeoutMs: 4000,
+    unverifiedBudgetMs: 60000,
+    onEvent: (e) => {
+      if (left === null && e.event === 'peer' && e.peerKey === cKey) left = c.swarm.destroy()
+    }
+  })
+  t.ok(left !== null, 'C joined the run and left before block 0')
+  if (left) await left
+  t.ok(rb.errorsSoft.includes('bloco 0 indisponível: ' + k.slice(0, 8)), 'the fetch for K ran and failed')
+  t.absent(rb.errors.some((e) => e.startsWith('tempo esgotado')), JSON.stringify(rb.errors))
+  t.ok(rb.ok, JSON.stringify(rb.errors))
+  t.alike(rb.unadvertised, [k])
+  t.absent(k in rb.downloaded)
+})
+
+test('review item 2: closed sockets in a fetch do not lock a later advertiser out of it', async (t) => {
+  t.timeout(90000)
+  const { bootstrap } = await testnet(t)
+  const kp = generateAssociationKeyPair()
+  const rendezvous = topicFor(hex(kp.publicKey))
+  const author = await rawAuthor(t, bootstrap, kp, 2, { join: false })
+  // Two short-lived identities advertise the key, never serve block 0, and
+  // fill the fetch (maxConnections 2) before they leave.
+  const liars = []
+  for (let i = 0; i < 2; i++) {
+    const liar = await rawNode(t, bootstrap, { have: () => [{ key: author.key, length: 3 }] })
+    await joinAndFlush(liar.swarm, [rendezvous])
+    liars.push(liar)
+  }
+  const liarKeys = liars.map((l) => hex(l.swarm.keyPair.publicKey))
+  const b = await makeMember(t, kp, { posts: 0 })
+  writeFollows(b.dir, [author.key])
+  let inspect = null
+  const seen = new Set()
+  // timeoutMs < gateTimeoutMs: the fetch is deadline-bound, so the author
+  // can only supply block 0 by joining that same fetch.
+  const p = runSync({
+    ...localSwarmOptions(bootstrap),
+    dataDir: b.dir,
+    once: true,
+    timeoutMs: 12000,
+    maxConnections: 2,
+    unverifiedBudgetMs: 60000,
+    inspectHook: (h) => { inspect = h },
+    onEvent: (e) => { if (e.event === 'peer') seen.add(e.peerKey) }
+  })
+  await until(() => liarKeys.every((k) => seen.has(k)), { timeoutMs: 20000, name: 'both liars joined the fetch' })
+  for (const liar of liars) await liar.swarm.destroy()
+  await until(() => inspect && !inspect.topicHasPeer(rendezvous), { timeoutMs: 20000, name: 'liars closed' })
+  await author.join()
+  const rb = await p
+  t.ok(rb.ok, JSON.stringify(rb.errors))
+  t.is(rb.downloaded[author.key], 3, 'the late author joined the fetch and the follow completed')
+  t.alike(rb.skipped, [])
+})
+
+test('review item 2: an advertiser refused by a full fetch gets the slot a closed socket frees', async (t) => {
+  t.timeout(90000)
+  const { bootstrap } = await testnet(t)
+  const kp = generateAssociationKeyPair()
+  const rendezvous = topicFor(hex(kp.publicKey))
+  const author = await rawAuthor(t, bootstrap, kp, 2, { join: false })
+  const authorKey = hex(author.swarm.keyPair.publicKey)
+  // Two liars advertise the key, never serve block 0 and fill the fetch.
+  const liars = []
+  for (let i = 0; i < 2; i++) {
+    const liar = await rawNode(t, bootstrap, { have: () => [{ key: author.key, length: 3 }] })
+    await joinAndFlush(liar.swarm, [rendezvous])
+    liars.push(liar)
+  }
+  const liarKeys = liars.map((l) => hex(l.swarm.keyPair.publicKey))
+  const b = await makeMember(t, kp, { posts: 0 })
+  writeFollows(b.dir, [author.key])
+  const seen = new Set()
+  // Two open sockets per fetch (the connection cap stays at its default so
+  // the author can connect while the fetch is full). timeoutMs <
+  // gateTimeoutMs: the fetch is deadline-bound, no retry fits before it.
+  const p = runSync({
+    ...localSwarmOptions(bootstrap),
+    dataDir: b.dir,
+    once: true,
+    timeoutMs: 12000,
+    maxFetchSockets: 2,
+    unverifiedBudgetMs: 60000,
+    onEvent: (e) => { if (e.event === 'peer') seen.add(e.peerKey) }
+  })
+  await until(() => liarKeys.every((k) => seen.has(k)), { timeoutMs: 20000, name: 'both liars joined the fetch' })
+  // The author advertises while the fetch is full: refused.
+  await author.join()
+  await until(() => seen.has(authorKey), { timeoutMs: 20000, name: 'author connected' })
+  for (const liar of liars) await liar.swarm.destroy()
+  const rb = await p
+  t.ok(rb.ok, JSON.stringify(rb.errors))
+  t.is(rb.downloaded[author.key], 3, 'the refused author took a freed slot and the follow completed')
+  t.alike(rb.skipped, [])
+})

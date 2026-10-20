@@ -814,3 +814,81 @@ test('retry item 3: sends before the channel opens are merged per key and bounde
   t.ok(queuedAfterKeys <= MAX_SEND_BACKLOG, 'the queue never exceeds MAX_SEND_BACKLOG')
   t.alike(logged.filter((e) => e.event === 'peer-dropped'), [{ event: 'peer-dropped', peerKey: peer.peerKey, reason: 'send-backlog' }])
 })
+
+test('item 3: queued have/rejected merge per key in order; admitted is never merged away', async (t) => {
+  t.timeout(60000)
+  const { bootstrap } = await testnet(t)
+  const k = '99'.repeat(32)
+  const m = 'aa'.repeat(32)
+  let peer = null
+  let raw = null
+  let maxQueued = 0
+  const logged = []
+  const a = await node(t, bootstrap, (socket) => {
+    if (peer) return
+    peer = attachAdmission(socket, { role: 'member', helloTimeoutMs: 60000, log: (e) => logged.push(e) })
+    // (a) 10 000 alternating have/rejected sends for one key, then two haves.
+    for (let i = 0; i < 10000; i++) {
+      if (i % 2 === 0) peer.send({ type: 'have', key: k, length: 1 + i })
+      else peer.send({ type: 'rejected', key: k, reason: 'r-' + i })
+      maxQueued = Math.max(maxQueued, peer.queued())
+    }
+    peer.send({ type: 'have', key: k, length: 20000 })
+    peer.send({ type: 'have', key: k, length: 20001 })
+    maxQueued = Math.max(maxQueued, peer.queued())
+    // (d) an admitted between haves for one key is kept, and a later
+    // rejected never moves before it.
+    peer.send({ type: 'have', key: m, length: 1 })
+    peer.send({ type: 'have', key: m, length: 2 })
+    peer.send({ type: 'admitted', key: m, length: 2 })
+    peer.send({ type: 'have', key: m, length: 3 })
+    peer.send({ type: 'have', key: m, length: 4 })
+    peer.send({ type: 'rejected', key: m, reason: 'late' })
+    peer.send({ type: 'have', key: m, length: 5 })
+  })
+  const b = await node(t, bootstrap, (socket) => {
+    if (raw) return
+    raw = rawChannel(socket)
+  })
+  await joinAndFlush(a.swarm, [TOPIC])
+  await joinAndFlush(b.swarm, [TOPIC])
+  await until(() => peer && raw, { name: 'peers' })
+  await raw.opened
+  await until(() => raw.received.length >= 7, { name: 'backlog flushed' })
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  t.ok(maxQueued <= 2, 'at most 2 entries queued for one key (' + maxQueued + ')')
+  t.is(raw.received[0].type, 'hello')
+  t.alike(raw.received.slice(1), [
+    { type: 'rejected', key: k, reason: 'r-9999' },
+    { type: 'have', key: k, length: 20001 },
+    { type: 'have', key: m, length: 2 },
+    { type: 'admitted', key: m, length: 2 },
+    { type: 'rejected', key: m, reason: 'late' },
+    { type: 'have', key: m, length: 5 }
+  ])
+  t.is(peer.queued(), 0)
+  t.alike(logged.filter((e) => e.event === 'peer-dropped'), [])
+})
+
+test('item 3: a have and a rejected per key for MAX_INVENTORY keys fit the send backlog', async (t) => {
+  t.timeout(60000)
+  const { bootstrap } = await testnet(t)
+  let peer = null
+  let queued = null
+  const logged = []
+  const a = await node(t, bootstrap, (socket) => {
+    if (peer) return
+    peer = attachAdmission(socket, { role: 'member', helloTimeoutMs: 60000, log: (e) => logged.push(e) })
+    for (let i = 0; i < MAX_INVENTORY; i++) peer.send({ type: 'have', key: (0x40000 + i).toString(16).padStart(64, '0'), length: 1 })
+    for (let i = 0; i < MAX_INVENTORY; i++) peer.send({ type: 'rejected', key: (0x50000 + i).toString(16).padStart(64, '0'), reason: 'invalid-log' })
+    queued = peer.queued()
+  })
+  // The remote replicates but never opens the admission channel.
+  const b = await node(t, bootstrap, () => {})
+  await joinAndFlush(a.swarm, [TOPIC])
+  await joinAndFlush(b.swarm, [TOPIC])
+  await until(() => peer, { name: 'peer' })
+  t.is(MAX_SEND_BACKLOG, 2 * MAX_INVENTORY + 64)
+  t.is(queued, 2 * MAX_INVENTORY, 'every distinct key stays queued')
+  t.alike(logged.filter((e) => e.event === 'peer-dropped'), [], 'not dropped')
+})
