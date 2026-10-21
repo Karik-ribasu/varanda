@@ -1,4 +1,5 @@
 const test = require('brittle')
+const { EventEmitter } = require('node:events')
 const b4a = require('b4a')
 const c = require('compact-encoding')
 const Corestore = require('corestore')
@@ -15,10 +16,12 @@ const {
   attachAdmission,
   validateMessage,
   watchFork,
+  startQuarantineFetch,
   quarantineGet0,
   MAX_INVENTORY,
   MAX_BAD_MESSAGES,
   MAX_CONNECTIONS,
+  MAX_FETCH_ATTACHMENTS,
   MAX_SEND_BACKLOG
 } = require('../lib/net')
 const { MAX_LOG_BLOCKS } = require('../lib/records')
@@ -274,9 +277,12 @@ test('limits: inventory cap, bad messages, hello timeout, admitted from a member
     const logged = []
     const dispatched = []
     let closes = 0
+    let sizeAtClose = -1
     const a = await node(t, bootstrap, (socket) => {
       if (peer) return
-      peer = attachAdmission(socket, { role: 'member', onmessage: (msg) => dispatched.push(msg), log: (e) => logged.push(e), onclose: () => closes++, ...opts })
+      // remoteHave is released after onclose (G1): sample it there.
+      const onclose = (p) => { closes++; sizeAtClose = p.remoteHave.size }
+      peer = attachAdmission(socket, { role: 'member', onmessage: (msg) => dispatched.push(msg), log: (e) => logged.push(e), onclose, ...opts })
     })
     const b = await node(t, bootstrap, (socket) => {
       if (raw) return
@@ -294,6 +300,7 @@ test('limits: inventory cap, bad messages, hello timeout, admitted from a member
       logged,
       dispatched,
       closes: () => closes,
+      sizeAtClose: () => sizeAtClose,
       remoteClosed: () => rawSocket.destroyed,
       dropped: () => logged.filter((e) => e.event === 'peer-dropped'),
       end: async () => { await a.swarm.destroy(); await b.swarm.destroy() }
@@ -309,7 +316,7 @@ test('limits: inventory cap, bad messages, hello timeout, admitted from a member
   }
   await until(() => inv.closes() === 1, { name: 'dropped on inventory overflow', timeoutMs: 30000 })
   t.alike(inv.dropped(), [{ event: 'peer-dropped', peerKey: inv.peer.peerKey, reason: 'inventory-limit' }])
-  t.is(inv.peer.remoteHave.size, MAX_INVENTORY, 'map capped at MAX_INVENTORY')
+  t.is(inv.sizeAtClose(), MAX_INVENTORY, 'map capped at MAX_INVENTORY')
   t.ok(inv.peer.inventoryComplete, 'inventory of MAX_INVENTORY keys completed before the overflow')
   await until(() => inv.remoteClosed(), { name: 'remote socket closed' })
   await inv.end()
@@ -688,6 +695,7 @@ test('H1 (cycle 3): a flood of one valid have is dropped with message-rate', asy
   const logged = []
   const dispatched = []
   let closes = 0
+  let sizeAtClose = -1 // remoteHave is released after onclose (G1)
   const a = await node(t, bootstrap, (socket) => {
     if (peer) return
     peer = attachAdmission(socket, {
@@ -696,7 +704,7 @@ test('H1 (cycle 3): a flood of one valid have is dropped with message-rate', asy
       messageRate: 10,
       onmessage: (msg) => dispatched.push(msg),
       log: (e) => logged.push(e),
-      onclose: () => closes++
+      onclose: (p) => { closes++; sizeAtClose = p.remoteHave.size }
     })
   })
   const b = await node(t, bootstrap, (socket) => {
@@ -713,7 +721,7 @@ test('H1 (cycle 3): a flood of one valid have is dropped with message-rate', asy
   t.alike(logged.filter((e) => e.event === 'peer-dropped'), [{ event: 'peer-dropped', peerKey: peer.peerKey, reason: 'message-rate' }])
   t.ok(dispatched.length <= 50, 'at most the burst was dispatched (' + dispatched.length + ')')
   t.is(peer.badMessages, 0, 'valid messages never count as bad')
-  t.is(peer.remoteHave.size, 1)
+  t.is(sizeAtClose, 1)
 })
 
 test('H1 (cycle 3): an honest seeder with a large inventory and per-block growth is not dropped', async (t) => {
@@ -891,4 +899,150 @@ test('item 3: a have and a rejected per key for MAX_INVENTORY keys fit the send 
   t.is(MAX_SEND_BACKLOG, 2 * MAX_INVENTORY + 64)
   t.is(queued, 2 * MAX_INVENTORY, 'every distinct key stays queued')
   t.alike(logged.filter((e) => e.event === 'peer-dropped'), [], 'not dropped')
+})
+
+test('G1: a pending quarantine fetch drops closed sockets and bounds its open attachments', async (t) => {
+  t.timeout(60000)
+  const { bootstrap } = await testnet(t)
+  const socketsB = new Map()
+  const b = await node(t, bootstrap, (socket) => socketsB.set(hex(socket.remotePublicKey), socket))
+  const qstoreB = new Corestore(tmpDir(t, 'varanda-quarantine-'))
+  await qstoreB.ready()
+  t.teardown(() => qstoreB.close(), { force: true })
+  await joinAndFlush(b.swarm, [TOPIC])
+  const remotes = []
+  for (let i = 0; i < 4; i++) {
+    const x = await node(t, bootstrap)
+    x.swarm.joinPeer(b.swarm.keyPair.publicKey)
+    remotes.push(hex(x.swarm.keyPair.publicKey))
+  }
+  await until(() => remotes.every((pk) => socketsB.has(pk)), { name: 'B connected to 4 remotes' })
+  const [s1, s2, s3, s4] = remotes.map((pk) => socketsB.get(pk))
+  t.is(MAX_FETCH_ATTACHMENTS, MAX_CONNECTIONS)
+
+  // Nobody holds these keys: both fetches stay pending until the timeout.
+  const fetch1 = startQuarantineFetch(qstoreB, 'fe'.repeat(32), [s1, s2], 5000)
+  const fetch2 = startQuarantineFetch(qstoreB, 'fd'.repeat(32), [s1], 5000, { maxAttachments: 3 })
+  let pending = 2
+  fetch1.promise.finally(() => pending--)
+  fetch2.promise.finally(() => pending--)
+  await until(() => fetch1.attachedCount() === 2 && fetch2.attachedCount() === 1, { name: 'initial sockets attached' })
+  t.ok(fetch2.addSocket(s2), '2nd socket attached')
+  t.ok(fetch2.addSocket(s3), '3rd socket attached')
+  t.absent(fetch2.addSocket(s3), 'a socket already attached is refused')
+  t.is(fetch2.attachedCount(), 3)
+  t.absent(fetch2.addSocket(s4), 'a 4th socket is refused while 3 are attached')
+
+  s1.destroy()
+  await until(() => fetch1.attachedCount() === 1 && fetch2.attachedCount() === 2, { name: 'closed socket released' })
+  t.ok(fetch2.addSocket(s4), 'the 4th socket is accepted once one of them closed')
+  s2.destroy()
+  s3.destroy()
+  await until(() => fetch1.attachedCount() === 0 && fetch2.attachedCount() === 1, { name: 'closed sockets released' })
+  t.is(pending, 2, 'both fetches are still pending')
+  t.absent(fetch2.addSocket(s1), 'a closed socket is not attached again')
+  // Capture the one-shot close listener the fetch registers on s4.
+  const onceClose = []
+  const once = s4.once
+  s4.once = function (name, fn) {
+    if (name === 'close') onceClose.push(fn)
+    return once.call(this, name, fn)
+  }
+  t.ok(fetch1.addSocket(s4), 'the default cap still admits a new socket')
+  s4.once = once
+  t.is(fetch1.attachedCount(), 1)
+  t.is(onceClose.length, 1, 'one close listener registered')
+  t.ok(s4.listeners('close').includes(onceClose[0]), 'registered while attached')
+
+  t.alike(await fetch1.promise, { raw: null, error: 'timeout', length: 0, byteLength: 0 })
+  t.alike(await fetch2.promise, { raw: null, error: 'timeout', length: 0, byteLength: 0 })
+  t.is(fetch1.attachedCount(), 0, 'settling clears the attachments')
+  t.absent(s4.listeners('close').includes(onceClose[0]), 'settling removes the close listener of a live socket')
+  t.absent(fetch1.addSocket(s4), 'a settled fetch attaches nothing')
+})
+
+test('G1: a closed admission peer releases its advertised keys', async (t) => {
+  t.timeout(60000)
+  const { bootstrap } = await testnet(t)
+  let peer = null
+  let sizeInOnclose = -1
+  const a = await node(t, bootstrap, (socket) => {
+    if (peer) return
+    peer = attachAdmission(socket, { role: 'member', onclose: (p) => { sizeInOnclose = p.remoteHave.size } })
+  })
+  let raw = null
+  const b = await node(t, bootstrap, (socket) => {
+    if (raw) return
+    raw = rawChannel(socket)
+  })
+  await joinAndFlush(a.swarm, [TOPIC])
+  await joinAndFlush(b.swarm, [TOPIC])
+  await until(() => peer && raw, { name: 'peers' })
+  await raw.opened
+  raw.sendJson({ type: 'hello', v: 1, role: 'member', count: 2, have: [{ key: 'ab'.repeat(32), length: 1 }, { key: 'cd'.repeat(32), length: 2 }] })
+  await until(() => peer.remoteHave.size === 2, { name: 'inventory received' })
+  raw.close()
+  await until(() => sizeInOnclose !== -1, { name: 'onclose' })
+  t.is(sizeInOnclose, 2, 'onclose still sees the advertised keys')
+  t.is(peer.remoteHave.size, 0, 'the advertised keys are released after close')
+})
+
+// A fake quarantine store whose core opens when the test says so and records
+// every socket it is asked to replicate.
+function fakeQuarantine () {
+  let open
+  const opened = new Promise((resolve) => { open = resolve })
+  let serve
+  const served = new Promise((resolve) => { serve = resolve })
+  const replicated = []
+  const core = {
+    length: 0,
+    byteLength: 0,
+    ready: () => opened,
+    replicate: (s) => { replicated.push(s) },
+    get: () => served,
+    purge: async () => {}
+  }
+  return { qstore: { get: () => core }, open, serve, replicated }
+}
+
+function fakeSocket () {
+  const s = new EventEmitter()
+  s.destroyed = false
+  s.destroy = () => {
+    if (s.destroyed) return
+    s.destroyed = true
+    s.emit('close')
+  }
+  return s
+}
+
+test('G1: a destroyed socket is refused, and one that closes before the core is ready is never replicated', async (t) => {
+  const q = fakeQuarantine()
+  const first = fakeSocket()
+  const early = fakeSocket()
+  const stays = fakeSocket()
+  const dead = fakeSocket()
+  dead.destroy()
+  const dying = fakeSocket()
+  dying.destroying = true
+  const fetch = startQuarantineFetch(q.qstore, 'fe'.repeat(32), [first], 1000)
+  t.absent(fetch.addSocket(dead), 'a destroyed socket is refused')
+  t.absent(fetch.addSocket(dying), 'a socket being destroyed is refused')
+  t.is(fetch.attachedCount(), 0)
+  t.ok(fetch.addSocket(early), 'added while the core opens')
+  t.ok(fetch.addSocket(stays), 'added while the core opens')
+  t.is(q.replicated.length, 0, 'nothing replicated before ready')
+  early.destroy()
+  t.is(fetch.attachedCount(), 1, 'the socket that closed meanwhile is dropped')
+  q.open()
+  await until(() => q.replicated.length === 2, { name: 'replicated after ready' })
+  t.alike(q.replicated, [stays, first], 'only the sockets still open are replicated')
+  t.absent(fetch.addSocket(dead), 'a destroyed socket is still refused after ready')
+  t.is(fetch.attachedCount(), 2)
+  q.serve(null)
+  t.alike(await fetch.promise, { raw: null, error: 'timeout', length: 0, byteLength: 0 })
+  t.is(fetch.attachedCount(), 0)
+  t.is(stays.listenerCount('close'), 0, 'no close listener left behind')
+  t.is(q.replicated.includes(early) || q.replicated.includes(dead) || q.replicated.includes(dying), false)
 })

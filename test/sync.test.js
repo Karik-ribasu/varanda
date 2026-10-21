@@ -1625,3 +1625,42 @@ test('review item 2: an advertiser refused by a full fetch gets the slot a close
   t.is(rb.downloaded[author.key], 3, 'the refused author took a freed slot and the follow completed')
   t.alike(rb.skipped, [])
 })
+
+test('G1: a closed peer releases its per-connection advertisement state', async (t) => {
+  t.timeout(120000)
+  const { bootstrap } = await testnet(t)
+  const kp = generateAssociationKeyPair()
+  const rendezvous = topicFor(hex(kp.publicKey))
+  const k = randomKey()
+  const b = await makeMember(t, kp, { posts: 0 })
+  writeFollows(b.dir, [k])
+  // A holder interested in our diary keeps the run open (long budget).
+  const holder = await rawNode(t, bootstrap, { have: () => [{ key: b.key, length: 0 }] })
+  await joinAndFlush(holder.swarm, [rendezvous])
+  let inspect = null
+  const seen = new Set()
+  const controller = new AbortController()
+  t.teardown(() => controller.abort(), { force: true })
+  const p = runSync({
+    ...localSwarmOptions(bootstrap),
+    dataDir: b.dir,
+    once: true,
+    timeoutMs: 100000,
+    unverifiedBudgetMs: 600000,
+    signal: controller.signal,
+    inspectHook: (h) => { inspect = h },
+    onEvent: (e) => { if (e.event === 'peer') seen.add(e.peerKey) }
+  })
+  // Advertises our diary and a followed key: both are tracked per peer.
+  const other = await rawNode(t, bootstrap, { have: () => [{ key: b.key, length: 1 }, { key: k, length: 1 }] })
+  await joinAndFlush(other.swarm, [rendezvous])
+  const otherKey = hex(other.swarm.keyPair.publicKey)
+  await until(() => seen.has(otherKey), { timeoutMs: 30000, name: 'peer connected' })
+  await other.swarm.destroy()
+  await until(() => inspect.lastClosedPeer() && inspect.lastClosedPeer().peerKey === otherKey, { timeoutMs: 30000, name: 'peer closed' })
+  const closed = inspect.lastClosedPeer()
+  t.is(closed.lastAdv.size, 0, 'lastAdv released')
+  t.is(closed.emittedHave.size, 0, 'emittedHave released')
+  controller.abort()
+  await p
+})
