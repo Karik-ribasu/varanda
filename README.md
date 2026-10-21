@@ -1,0 +1,474 @@
+# varanda
+
+Protótipo de fase 0 de uma rede social ponto a ponto no Holepunch (Hypercore, Hyperswarm e HyperDHT). Os comandos são um programa de terminal. A referência normativa dos formatos é [docs/protocol.md](docs/protocol.md).
+
+## O que é
+
+Cada pessoa tem um diário assinado no próprio dispositivo. Seguidores e semeadores guardam cópias. O semeador só guarda um diário cujo bloco 0 traz um certificado de membro válido da associação em que ele confia. A identidade é a chave pública desse diário: 64 dígitos hexadecimais (32 bytes).
+
+Quem acompanha outra pessoa pede o diário dela aos pares e ao semeador. Com o processo de sincronização da autora já encerrado, o semeador continua servindo a cópia que admitiu.
+
+O semeador também tem certificado da mesma associação. Só um semeador verificado por esse certificado conta como admissão (`admitted`).
+
+## Requisitos
+
+- Node.js 20 ou mais novo (`engines.node` é `>=20`)
+- npm
+
+O protótipo roda no Node. Esta fase não usa o runtime Pear, não usa o runtime Bare e não tem interface gráfica. Não há etapa de compilação.
+
+## Instalação
+
+Na raiz deste repositório:
+
+```sh
+npm install
+```
+
+O programa é `node bin/varanda.js`. A ajuda:
+
+```sh
+node bin/varanda.js help
+```
+
+`--help` e `-h` imprimem o mesmo texto. Os valores vão em separado: `--flag valor`. A forma `--flag=valor` é uma opção desconhecida (código 2).
+
+## Conceitos
+
+### Ajuda
+
+`node bin/varanda.js help` imprime exatamente:
+
+```
+varanda — protótipo de rede social P2P (fase 0)
+Uso: node bin/varanda.js <comando> [subcomando] [opções]
+Comandos:
+  assoc init|show|certify    chave da associação de teste e certificados de membro
+  assoc certify-seeder       certifica a chave de um semeador (--seeder)
+  id create|show             identidade (chave pública do diário)
+  cert add                   grava o certificado como bloco 0 do diário
+  profile set                define nome e bio
+  post                       publica um texto (--text)
+  reply                      responde a uma publicação (--to <chave>:<seq> --text)
+  follow|unfollow|follows    segue ou deixa de seguir uma chave pública
+  log                        mostra os blocos locais de um diário
+  feed                       feed com as publicações dos diários seguidos
+  sync                       sincroniza com pares e com o semeador (--once, --timeout-ms)
+  seed                       semeador sempre ligado
+  seed key|cert add          chave do semeador e seu certificado (--cert-file)
+  help                       esta ajuda
+Opções globais:
+  --data <dir>               diretório de dados (ou VARANDA_DATA, padrão ./data)
+  --association <hex>        chave pública da associação (ou VARANDA_ASSOCIATION)
+  --bootstrap <host:porta>   repetível (ou VARANDA_BOOTSTRAP, separado por vírgula)
+  --dht-host <ip>            endereço local da DHT (ou VARANDA_DHT_HOST)
+  --json                     saída JSON na última linha
+Opções dos comandos:
+  --member --seeder --age-band --method --out --cert-file --name --bio --text
+  --to --author --limit --once --timeout-ms
+```
+
+`--json` coloca um objeto JSON na última linha da saída padrão. Em `sync` e `seed`, cada evento é uma linha JSON e o resultado fecha a saída. Nenhum comando imprime chave secreta. `seed key` imprime só a chave pública Noise do semeador.
+
+### Registros
+
+O diário é uma sequência de blocos JSON. O índice do bloco é o `seq`, a partir de 0.
+
+- Bloco 0: `{ "type": "member-cert", "cert": <certificado> }`. O campo `cert.member` é a chave pública do diário. Sem esse bloco o diário não recebe perfil, publicação nem resposta.
+- `profile`: nome (1 a 80 caracteres) e bio (0 a 280).
+- `post`: texto (1 a 1000 caracteres). Uma resposta é um `post` com `replyTo` apontando para `<chave>:<seq>` de outra publicação. O `seq` do alvo é um inteiro maior ou igual a 1, porque o bloco 0 é o certificado.
+
+O nome não leva caractere de controle (código menor que 0x20). Em bio e texto o único controle permitido é a quebra de linha (LF).
+
+### Certificado de membro
+
+O certificado tem exatamente estas chaves: `v` (1), `member` (chave pública do diário), `ageBand`, `method`, `date` (ISO-8601 UTC canônico, com milissegundos), `association` (chave pública da associação) e `signature` (128 hex minúsculos).
+
+Faixas sugeridas: `13-15`, `16-17`, `18+`. O padrão de `assoc certify` é `--age-band 18+` e `--method stub`. `ageBand` casa com `/^[a-z0-9+-]{1,32}$/`; `method` casa com `/^[a-z0-9-]{1,32}$/`.
+
+A associação guarda, por membro, só a chave pública, a faixa etária, o método e a data (`members.jsonl`). Não guarda assinatura, chave secreta, imagem nem documento. Quem opera `assoc certify` afirma a faixa etária. A checagem de idade de um provedor real está fora desta fase (comentário `TODO(phase1)` em `lib/assoc.js`).
+
+### Certificado de semeador
+
+O certificado do semeador tem exatamente estas chaves: `v` (1), `seeder` (chave pública Noise, a mesma que `seed key` imprime), `date`, `association` e `signature`. O prefixo assinado é `varanda-seeder-v1`, diferente de `varanda-cert-v1`. Uma assinatura de membro não valida certificado de semeador, e uma assinatura de semeador não valida certificado de membro.
+
+A associação registra em `seeders.jsonl` só a chave do semeador e a data. Sem assinatura e sem segredo.
+
+### Semeador e admissão
+
+O semeador fica ligado, no tópico da associação, e replica os diários que admitiu. Na entrada ele confere o bloco 0. Diário com certificado de outra associação, certificado malformado, bloco 0 inválido ou histórico reescrito (`fork`) é recusado.
+
+No `sync`, um par só conta como semeador verificado quando o `hello` traz papel `seeder`, o certificado confere com a chave Noise autenticada da conexão e a associação é a raiz fixada em `config.json`. O resultado `admitted: true` exige esse semeador verificado. Um par que se diz semeador sem esse certificado aparece como `peer seeder <8 hex> não verificado`. O `admitted` desse par não é impresso e não marca o diário como admitido. Um `rejected` para o próprio diário vindo de qualquer par que não seja semeador verificado vira a linha `withdrawn <chave> <8 hex do par> <motivo>` e não decide o sucesso do `sync`.
+
+`sync --once` sai com código 0 quando ao menos um par enviou `hello`, nenhum diário seguido ficou atrás do tamanho que um par anunciou, os pares interessados no próprio diário alcançaram o tamanho dele e, se há semeador verificado e o bloco 0 local é um certificado válido, um semeador verificado enviou `admitted` até esse tamanho. O prazo padrão é 30000 ms (`--timeout-ms`).
+
+### Tópico por associação
+
+Membros e semeadores da mesma associação se encontram num tópico de rendezvous derivado da chave pública dessa associação (`varanda/rendezvous/v1:` + hex). Cada um também anuncia a chave de descoberta dos diários que guarda.
+
+### Raiz de confiança
+
+Cada diretório confia numa única chave pública de associação, gravada em `config.json` e imutável depois.
+
+- Membro: `id create` exige `--association <hex>` ou `VARANDA_ASSOCIATION` na primeira vez e grava `{ "v": 1, "role": "member", "association": "<hex64>" }`. Rodar de novo devolve a mesma chave pública do diário.
+- Semeador: o primeiro entre `seed key`, `seed cert add` e `seed` grava `{ "v": 1, "role": "seeder", "association": "<hex64>" }`. Sem associação nessa primeira vez o uso é `informe --association ou VARANDA_ASSOCIATION` (código 2).
+
+Num comando seguinte, `--association` e `VARANDA_ASSOCIATION` são opcionais. Se vierem, têm de ser o valor já gravado. Caso contrário o erro é `associação diferente da configurada` (código 1). O nó não escolhe a raiz lendo um certificado recebido.
+
+`assoc show --data <dir>` e `id show --data <dir>` imprimem de novo a chave pública. `id show` sem identidade termina com `erro: identidade não encontrada`.
+
+### Variáveis de ambiente
+
+| Variável | Função |
+| --- | --- |
+| `VARANDA_DATA` | Diretório de dados. Padrão `./data`. O passo a passo usa `--data` no lugar dela. |
+| `VARANDA_ASSOCIATION` | Chave pública da associação (64 hex, qualquer caixa; gravada em minúsculas). |
+| `VARANDA_BOOTSTRAP` | Nós `host:porta` separados por vírgula. Ausente, e sem `--bootstrap`, os comandos usam a DHT pública. |
+| `VARANDA_DHT_HOST` | Endereço local em que a DHT deste processo escuta. O mesmo que `--dht-host`. |
+
+`--bootstrap` pode repetir. Se algum `--bootstrap` aparece na linha, ele prevalece sobre `VARANDA_BOOTSTRAP`. `--dht-host` prevalece sobre `VARANDA_DHT_HOST`.
+
+Um `VARANDA_BOOTSTRAP` vazio ou malformado é erro de uso e não cai na DHT pública. Exemplos: `uso: bootstrap inválido (vazio)`, `uso: bootstrap inválido localhost`. A porta não leva zero à esquerda; o formato é `host:porta` com porta de 1 a 65535.
+
+`VARANDA_DHT_HOST` e `--dht-host` aceitam uma string não vazia e sem espaço. Qualquer outro valor termina com `uso: dht-host inválido`.
+
+A DHT local de `scripts/local-dht.js` escuta só em `127.0.0.1`. Com ela, defina `VARANDA_DHT_HOST=127.0.0.1` ou passe `--dht-host 127.0.0.1`. Testes e `npm run demo` usam esse endereço. Sem bootstrap (DHT pública, uso manual), o endereço local é opcional e a DHT fica nos padrões da biblioteca.
+
+### Um processo por diretório de dados
+
+`store/` é um Corestore em RocksDB e segura um lock do sistema. Antes de abri-lo, o `varanda` também cria o lock `<dir>/.varanda-lock` (com o pid do processo). Um segundo processo no mesmo `--data` falha com `erro: diretório de dados em uso` enquanto o primeiro não fecha o store; um lock deixado por um processo que morreu é retomado sozinho. Um lock sem pid legível só é retomado quando o diretório do lock tem mais de 10 segundos. Se `.varanda-lock` não for um diretório (um arquivo ou um link simbólico), a abertura falha na hora com `erro: lock inválido (não é um diretório): <caminho>`; um link simbólico em `<dir>/store` também é recusado. Se o pid de um processo morto foi reaproveitado por outro processo seu, o lock continua em uso: confira que nenhum processo `varanda` usa o diretório e apague `<dir>/.varanda-lock` à mão. Comandos curtos abrem e fecham. `sync` e `seed` seguram o diretório o tempo todo em que estão rodando.
+
+O store principal abre antes de `quarantine/` ser apagado. O segundo processo esbarra no lock e não apaga a quarentena de um `sync` ou `seed` que já está de pé.
+
+Não misture papéis no mesmo diretório. Comando de membro em diretório de semeador: `diretório não é de um membro`. Comando de semeador em diretório de membro: `diretório não é de um semeador`.
+
+### Publicação no futuro e diário reescrito
+
+Uma publicação válida cuja data `at` está mais de 24 horas à frente do relógio de quem lê (`MAX_FUTURE_MS` = 86400000 em `lib/feed.js`) fica de fora do feed. O comando avisa em stderr `aviso: publicação <chave>:<seq> ignorada (future)`. Ela volta sozinha quando o relógio do leitor chega em `at` menos 24 horas. Publicação no passado permanece e afunda na ordem `(at, autor, seq)`. O corte é pular, não redatar: redatar mudaria a posição em cada leitor e em cada execução.
+
+Nenhum escritor desta fase trunca o diário. Se `fork` deixa de ser zero, o detentor da chave reescreveu o histórico. Esse diário é descartado em todo lugar, motivo `fork`: o semeador para de servi-lo, o `sync` apaga a réplica e o `feed` avisa `aviso: diário <8 hex> ignorado (fork)`. O `feed` só lê; o próximo `sync` é que apaga a cópia local.
+
+## Passo a passo manual
+
+Dois diários (Alice e Bob) e um semeador, na mesma máquina, em diretórios novos:
+
+- `data/assoc` — associação de teste
+- `data/seeder` — semeador
+- `data/alice` — diário da Alice
+- `data/bob` — diário do Bob
+- `data/certs` — JSON dos certificados (`--out` / `--cert-file`); não é um diretório de papel
+
+Rode tudo na raiz do repositório, em bash ou zsh (as linhas com `$(...)` e `${var##padrão}` dependem disso). `data/` está no `.gitignore`. Se esses diretórios já existem de uma tentativa anterior, use outros caminhos ou apague-os antes: `assoc init` recusa uma associação já criada, e `cert add` recusa um bloco 0 diferente do que já está no diário.
+
+Cada comando deve terminar com código 0 antes do próximo. A chave secreta da associação fica em `data/assoc/association.json` (modo `0600`). A chave secreta Noise do semeador fica em `data/seeder/seeder-key.json` (modo `0600`). Nenhum comando as imprime. Não as copie para o terminal.
+
+### 1. DHT local, ou a DHT pública
+
+**DHT local** (um computador, sem a DHT pública). Num terminal, deixe rodando:
+
+```sh
+node scripts/local-dht.js
+```
+
+A porta padrão é 49737 (`node scripts/local-dht.js --port 49800` escolhe outra). O processo escuta só em `127.0.0.1` e imprime uma linha `export VARANDA_BOOTSTRAP=127.0.0.1:<porta>`. Ctrl-C encerra.
+
+Nos outros terminais, use a linha impressa e o endereço local. Com a porta padrão:
+
+```sh
+export VARANDA_BOOTSTRAP=127.0.0.1:49737
+export VARANDA_DHT_HOST=127.0.0.1
+```
+
+**DHT pública.** Não inicie `scripts/local-dht.js` e deixe `VARANDA_BOOTSTRAP` e `VARANDA_DHT_HOST` sem definir (`unset VARANDA_BOOTSTRAP VARANDA_DHT_HOST`: um `VARANDA_DHT_HOST=127.0.0.1` que sobrou da DHT local prenderia a DHT ao loopback, longe dos pares públicos). Os comandos usam a DHT pública. Não passe `--bootstrap` nem `--dht-host`. Nas linhas de `seed` e `sync` abaixo, apague `--bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"`.
+
+### 2. Associação
+
+```sh
+line=$(node bin/varanda.js assoc init --data data/assoc)
+printf '%s\n' "$line"
+ASSOC=${line##* }
+```
+
+A linha é `chave pública da associação: ` seguida de 64 hex. `$ASSOC` é essa chave.
+
+### 3. Chave do semeador, certificado, depois o processo
+
+`seed key` cria `data/seeder`, grava a raiz de confiança e cria `seeder-key.json` se ele ainda não existe. Na segunda vez devolve a mesma chave pública.
+
+```sh
+line=$(node bin/varanda.js seed key --data data/seeder --association "$ASSOC")
+printf '%s\n' "$line"
+SEEDER=${line##* }
+```
+
+A linha é `chave do semeador: ` seguida de 64 hex.
+
+```sh
+mkdir -p data/certs
+node bin/varanda.js assoc certify-seeder --data data/assoc --seeder "$SEEDER" --out data/certs/seeder.json
+node bin/varanda.js seed cert add --data data/seeder --association "$ASSOC" --cert-file data/certs/seeder.json
+```
+
+A primeira imprime `certificado do semeador gravado em <caminho absoluto>`. A segunda imprime `certificado do semeador gravado`. Sem `--seeder` o uso é `uso: informe --seeder <hex>`. Sem `--cert-file` o uso é `uso: informe --cert-file <arquivo>`.
+
+Noutro terminal, com as mesmas variáveis `VARANDA_BOOTSTRAP`, `VARANDA_DHT_HOST` e `ASSOC`, deixe o semeador ligado:
+
+```sh
+node bin/varanda.js seed --data data/seeder --association "$ASSOC" --bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"
+```
+
+Espere `seed ready`. Esse processo segura `data/seeder` até Ctrl-C, e então sai com código 0. Não rode outro comando com `--data data/seeder` enquanto ele estiver no ar.
+
+`seed` sem `seeder-key.json` sai 1 com `erro: chave do semeador não encontrada (use seed key)`. Sem `seeder-cert.json`: `erro: certificado do semeador não encontrado (use seed cert add)`. Certificado que não bate com a chave ou com a associação: `erro: certificado do semeador inválido (<motivo>)`. Esses três erros acontecem antes de qualquer rede.
+
+### 4. Alice e Bob
+
+```sh
+line=$(node bin/varanda.js id create --data data/alice --association "$ASSOC")
+printf '%s\n' "$line"
+ALICE=${line##* }
+
+line=$(node bin/varanda.js id create --data data/bob --association "$ASSOC")
+printf '%s\n' "$line"
+BOB=${line##* }
+```
+
+Cada linha é `chave pública: ` seguida da chave do diário. Essa chave é a identidade. Repetir `id create` no mesmo diretório imprime a mesma chave.
+
+```sh
+node bin/varanda.js assoc certify --data data/assoc --member "$ALICE" --age-band '18+' --method stub --out data/certs/alice.json
+node bin/varanda.js assoc certify --data data/assoc --member "$BOB" --age-band '18+' --method stub --out data/certs/bob.json
+node bin/varanda.js cert add --data data/alice --cert-file data/certs/alice.json
+node bin/varanda.js cert add --data data/bob --cert-file data/certs/bob.json
+```
+
+`cert add` imprime `certificado gravado (bloco 0)`. O certificado tem de ser desta chave e desta associação. Um certificado de outra associação falha com `certificado inválido (untrusted-association)` (código 1).
+
+```sh
+node bin/varanda.js profile set --data data/alice --name 'Alice' --bio 'protótipo'
+line=$(node bin/varanda.js post --data data/alice --text 'primeira publicação')
+printf '%s\n' "$line"
+SEQ=${line##*#}
+printf '%s\n' "$ALICE:$SEQ"
+```
+
+`profile set` imprime `perfil atualizado #<seq>`. `post` imprime `publicado #<seq>`. `$SEQ` é esse número (inteiro maior ou igual a 1). Perfil, publicação e resposta exigem o bloco 0; sem ele a mensagem é `erro: grave o certificado de membro antes de publicar`.
+
+### 5. Alice sincroniza e sai
+
+```sh
+node bin/varanda.js sync --data data/alice --once --timeout-ms 30000 --bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"
+```
+
+A saída passa por `sync ready`, `peer seeder <8 hex>` e `admitted <chave da Alice> <tamanho>`, e fecha com `sync done` (código 0). O processo da Alice termina aí. O semeador permanece com a cópia.
+
+Bob recebe a publicação por esse semeador com o `sync` da Alice já encerrado. A cópia está em `data/seeder` (`admitted.json` e `store/`). Parar o semeador com Ctrl-C (código 0) e subir de novo o mesmo comando `seed`, no mesmo diretório, continua servindo o diário depois de `seed ready`. É o que a demo automática confere. Os comandos abaixo valem para o processo que já imprimiu `seed ready`, seja o original, seja o que subiu do disco.
+
+Sem par até o prazo, `sync` imprime `sync failed: sem pares` ou `sync failed: tempo esgotado: ...` e sai com código 1. Confira o terminal do semeador e o `VARANDA_BOOTSTRAP` / `--dht-host`.
+
+### 6. Bob segue, sincroniza, lê e responde
+
+```sh
+node bin/varanda.js follow --data data/bob --author "$ALICE"
+node bin/varanda.js sync --data data/bob --once --timeout-ms 30000 --bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"
+node bin/varanda.js feed --data data/bob
+```
+
+`follow` imprime `seguindo ` e a chave da Alice. O `sync` do Bob baixa o diário dela pelo semeador (`downloaded <chave da Alice> <tamanho>`) e termina com `sync done`. `feed` lista a publicação, no formato `[<data>] Alice (<8 hex>) #<seq>` e o texto na linha seguinte. `feed` não abre a rede.
+
+```sh
+node bin/varanda.js reply --data data/bob --to "$ALICE:$SEQ" --text 'também li'
+node bin/varanda.js sync --data data/bob --once --timeout-ms 30000 --bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"
+```
+
+`reply` imprime `publicado #<seq>`. O segundo `sync` entrega a resposta ao semeador. `--to` é `<64 hex>:<seq>` com `seq` maior ou igual a 1, sem zero à esquerda. Fora isso o uso é `referência inválida`.
+
+Para encerrar: Ctrl-C no semeador (código 0) e Ctrl-C na DHT local.
+
+## Demo automática
+
+```sh
+npm run demo
+```
+
+O mesmo programa é `node scripts/demo.js`. Ele sobe uma DHT em processo, em `127.0.0.1` (três nós), define `VARANDA_BOOTSTRAP` e `VARANDA_DHT_HOST=127.0.0.1`, e não fala com a DHT pública. Os dados ficam num diretório temporário, apagado no fim (salvo com `--keep`).
+
+O que a demo mostra, nesta ordem:
+
+1. Duas associações de teste.
+2. Identidades de A (Ana) e de B.
+3. A associação certifica A e B; cada um grava o certificado no bloco 0.
+4. `seed key`, `assoc certify-seeder` e `seed cert add`.
+5. Ana define o perfil. B segue A ainda fora da rede.
+6. O semeador sobe (`seed ready`).
+7. Ana publica e faz `sync --once` com o semeador. O processo dela termina: Ana fica offline.
+8. O semeador recebe SIGTERM (código 0) e um processo novo abre o mesmo diretório, a partir do disco.
+9. B entra com `sync --once` e recebe a publicação só pelo semeador. O feed de B mostra o texto.
+10. B responde. Ana volta, segue B, sincroniza e lê a resposta no feed.
+11. C confia na primeira associação e tenta gravar um certificado emitido pela segunda. `cert add` sai com código 1 e `untrusted-association` no stderr. O `sync` de C não é admitido.
+12. Um segundo semeador que só tem `seed key`, sem certificado, não sobe: `seed` sai com código 1.
+
+No sucesso o processo sai com código 0 e imprime `DEMO OK`. Na primeira falha imprime `DEMO FALHOU: <passo>` e sai com código 1.
+
+`--keep`, ou `VARANDA_DEMO_KEEP=1`, conserva o diretório temporário:
+
+```sh
+npm run demo -- --keep
+```
+
+## Testes e lint
+
+```sh
+npm test
+npm run lint
+node test/smoke.test.js
+```
+
+`npm test` roda `node scripts/run-tests.js`, que executa cada `test/*.test.js` em sequência. Um arquivo sozinho:
+
+```sh
+node test/assoc.test.js
+node test/cert.test.js
+node test/cli.test.js
+node test/commands.test.js
+node test/e2e.test.js
+node test/feed.test.js
+node test/net.test.js
+node test/records.test.js
+node test/seeder.test.js
+node test/smoke.test.js
+node test/store.test.js
+node test/sync.test.js
+```
+
+Os testes de rede usam uma DHT local em processo (`hyperdht/testnet` por `test/helpers/net.js`), presa a `127.0.0.1`. Nenhum teste usa a DHT pública. `npm run lint` roda o `standard`.
+
+## Layout de armazenamento
+
+Arquivos JSON de estado são gravados num arquivo temporário e renomeados por cima do destino. `store/` (modo `0700`) contém a chave primária do Corestore; a chave que assina o diário deriva dela. `id show` e `seed key` imprimem só chaves públicas.
+
+### Membro (`data/alice`, `data/bob`)
+
+- `store/` — Corestore do diário e das réplicas seguidas.
+- `quarantine/` — Corestore só da busca do bloco 0 de um diário ainda não aceito. O `sync` apaga esse diretório ao abrir (depois do lock de `store/`) e de novo ao fechar. Não é estado.
+- `config.json` — `{ "v": 1, "role": "member", "association": "<hex64>" }`, escrito por `id create`.
+- `follows.json` — `{ "v": 1, "follows": ["<hex64>"] }`, chaves únicas em ordem.
+
+### Semeador (`data/seeder`)
+
+- `store/` — réplicas admitidas. Todo core aqui está listado em `admitted.json`.
+- `quarantine/` — busca do bloco 0 na admissão. Apagado em cada `seed` (depois do lock de `store/`) e de novo ao fechar. Não é estado.
+- `config.json` — `{ "v": 1, "role": "seeder", "association": "<hex64>" }`, escrito pelo primeiro de `seed key`, `seed cert add` e `seed`.
+- `seeder-key.json` — par Noise do semeador, modo `0600`: `v`, `publicKey` (hex64) e `secretKey`. Criado por `seed key`. O comando não imprime `secretKey`.
+- `seeder-cert.json` — certificado do semeador em JSON indentado, escrito por `seed cert add`.
+- `admitted.json` — único arquivo de estado: `{ "v": 1, "admitted": { "<hex64>": <certificado de membro> } }`. A chave entra nesse arquivo antes do core abrir em `store/`. Uma chave em descarte permanece no arquivo até a limpeza do core terminar.
+
+### Associação (`data/assoc`)
+
+- `association.json` — par de chaves da associação, modo `0600`. `assoc show` imprime só a chave pública.
+- `members.jsonl` — uma linha JSON por certificado de membro, exatamente `member`, `ageBand`, `method` e `date`.
+- `seeders.jsonl` — uma linha JSON por certificado de semeador: `{"seeder":"<hex64>","date":"<ISO>"}`. Sem assinatura e sem segredo.
+
+Exemplo de linha em `members.jsonl` (a data real é a da emissão):
+
+```json
+{"member":"<hex64>","ageBand":"18+","method":"stub","date":"2026-01-01T00:00:00.000Z"}
+```
+
+## Formato dos dados
+
+### Bloco 0 e registros
+
+```json
+{ "type": "member-cert", "cert": { "v": 1, "member": "<hex64>", "ageBand": "18+", "method": "stub", "date": "2026-01-01T00:00:00.000Z", "association": "<hex64>", "signature": "<128 hex minúsculos>" } }
+{ "type": "profile", "name": "Alice", "bio": "protótipo", "at": "2026-01-01T00:00:00.000Z" }
+{ "type": "post", "text": "primeira publicação", "at": "2026-01-01T00:00:00.000Z", "replyTo": null }
+{ "type": "post", "text": "também li", "at": "2026-01-01T00:00:00.000Z", "replyTo": { "author": "<hex64>", "seq": 2 } }
+```
+
+`at` é `new Date().toISOString()` na hora da escrita e tem de ser canônico. Serve para ordenar. Quem lê pula bloco que não é um registro válido e não renumera os outros. A referência de uma publicação é `<hex64>:<seq>`.
+
+O feed ordena por `(at, autor, seq)`. `--limit <n>` fica com as últimas `n` depois de tirar as publicações futuras. Item: autor, nome (ou nulo), `seq`, `at`, texto e `replyTo`.
+
+Certificado do semeador (`seeder-cert.json`), também com exatamente estas chaves:
+
+```json
+{
+  "v": 1,
+  "seeder": "<hex64 da chave Noise>",
+  "date": "2026-01-01T00:00:00.000Z",
+  "association": "<hex64>",
+  "signature": "<128 hex minúsculos>"
+}
+```
+
+### Assinatura
+
+A assinatura cobre bytes UTF-8 de linhas separadas por um único LF, sem LF no final. O texto assinado não é a saída de `JSON.stringify`. O hex entra em minúsculas.
+
+Certificado de membro, seis linhas:
+
+```
+varanda-cert-v1
+<member hex64>
+<faixa etária>
+<método>
+<data ISO>
+<association hex64>
+```
+
+Certificado de semeador, quatro linhas:
+
+```
+varanda-seeder-v1
+<seeder hex64>
+<data ISO>
+<association hex64>
+```
+
+A associação assina esses bytes com a chave secreta Ed25519 dela. A assinatura no JSON é esse resultado em 128 hex minúsculos.
+
+Diante da chave do diário, a verificação devolve o primeiro motivo nesta ordem: `malformed`, `member-mismatch`, `untrusted-association`, `bad-signature`. No semeador a ordem é `malformed`, `seeder-mismatch`, `untrusted-association`, `bad-signature`. `no-cert` é bloco 0 ausente. `not-in-log` é bloco 0 presente que não é um registro `member-cert` válido. `fork` é histórico reescrito. `timeout` é prazo da busca do bloco 0 esgotado, no semeador que responde a um `announce`.
+
+### Chave do diário
+
+O Corestore deriva o par Ed25519 que assina o diário a partir da chave primária do store, criada neste dispositivo, e deriva a chave do core de um manifesto de um único assinante. A chave pública do diário, a que `id create` imprime, é a chave do core. Ela não coincide byte a byte com a chave pública crua do assinante. Só o dispositivo que tem esse `store/` acrescenta blocos.
+
+### Leitura: futuro e fork
+
+Publicação com `Date.parse(at)` mais de 24 horas à frente de quem lê sai do feed e entra na lista `future` (`<hex64>:<seq>`). O aviso é `aviso: publicação <ref> ignorada (future)`. A ordem dos itens que ficam continua determinística para aquele relógio.
+
+Diário com `fork` diferente de zero foi reescrito por quem tem a chave. O semeador deixa de semeá-lo. O `sync` apaga a réplica e avisa em stderr `aviso: diário <8 hex> ignorado (fork)`. O `feed` emite o mesmo aviso e só lê; o próximo `sync` é que apaga a cópia local.
+
+## Limitações e próximos passos
+
+Limites desta fase:
+
+- Um bloco tem no máximo 16 KiB. Um diário tem no máximo 100 000 blocos e 64 MiB. Publicar além disso falha com `erro: limite do diário atingido`, e o semeador descarta um diário acima do limite com motivo `quota`.
+- No máximo 64 conexões por processo.
+- No máximo 4096 diários anunciados por par.
+- Um par que viola o protocolo é desconectado.
+- O semeador aceita até 10 anúncios por segundo de cada par (rajada de 20); um par cujo certificado falha 16 vezes é desconectado.
+- No máximo 4095 diários seguidos: `follow` além disso falha com `erro: limite de diários seguidos atingido`.
+- `sync --once` espera pares que não são semeadores verificados por no máximo 5 s no total, quantos forem. Sem um semeador verificado que confirme a sua cópia, o resultado é `sync done (sem confirmação de semeador)`: ninguém garantiu guardar o seu diário.
+- Cada conexão aceita até 100 mensagens por segundo (rajada de 4160); um par acima disso é desconectado.
+- Em `sync --once`, a busca do bloco 0 de um diário seguido dura no máximo 15 s; se ninguém o entregar, o diário aparece como não anunciado e o resultado pode ser `sync done` sem ele.
+- `log --author <chave>` exige dados locais do diário (`erro: sem dados locais para este diário` caso contrário).
+
+Fora desta fase:
+
+- Verificação de idade real. Hoje o operador de `assoc certify` afirma `--age-band`. Comentário `TODO(phase1): the real age-check vendor decides here; today the operator asserts the age band.` em `lib/assoc.js`. O mesmo limite está em `docs/protocol.md` (certificados).
+- Notificações push quando um diário seguido cresce. Comentário `TODO(phase1): push notifications when a followed log grows.` em `lib/sync.js` e em `docs/protocol.md` (sync).
+- Recuperação da chave do diário com chaves limiar FROST. Comentário `TODO(phase2): threshold-key (FROST) recovery of this key.` em `docs/protocol.md` (identidade). A chave fica no `store/` deste dispositivo.
+- Listas de moderação e revogação. Certificado de membro e certificado de semeador não expiram e não são revogados nesta fase. Comentários `TODO(phase2): moderation lists — consult a block list before admitting.` e `TODO(phase2): certificate revocation list.` em `lib/seeder.js`. Também `TODO(later): media attachments and moderation lists are out of scope for phase 0.` em `lib/records.js`, e os `TODO(phase2)` / `TODO(later phases)` correspondentes em `docs/protocol.md` (registros, certificados e admissão).
+- Mídia. Publicação é só texto, até 1000 caracteres. O comentário de `lib/records.js` citado acima, e `docs/protocol.md` (registros), deixam anexos para uma fase posterior.
+- Empacotamento Pear ou Bare, e interface gráfica. O protótipo é um programa Node. Não há comentário `TODO` no código para esse empacotamento.
+- Relay de certificados por seguidores. O `sync` anuncia só o próprio diário (`lib/sync.js` envia `announce` da chave local e ignora `announce` recebido). Um seguidor não apresenta ao semeador o certificado de outra pessoa. Se a autora nunca sincronizou, o semeador não tem a cópia, mesmo que um seguidor já a tenha. Não há comentário `TODO` no código para esse relay. `docs/protocol.md` registra que o `announce` permanece sem autenticação de propósito: qualquer par pode pedir a admissão, e só entra o diário cujo bloco 0 passa na verificação.
+
+## Códigos de saída
+
+| Código | Quando |
+| --- | --- |
+| 0 | Sucesso. `sync --once` imprime `sync done` (ou `sync done (sem confirmação de semeador)` quando nenhum semeador verificado confirmou a cópia do seu diário). `seed` e a DHT local saem com 0 depois de SIGINT ou SIGTERM. A demo imprime `DEMO OK`. |
+| 1 | Falha. Mensagem em stderr: `erro: <mensagem>`. Exemplos: `erro: certificado inválido (untrusted-association)`, `erro: certificado do semeador não encontrado (use seed cert add)`, `erro: associação diferente da configurada`. `sync` com metas não cumpridas também sai 1 e escreve `sync failed: <erros>` na saída padrão. |
+| 2 | Uso. O analisador escreve `uso: <mensagem>` e em seguida a ajuda. Exemplos: `uso: bootstrap inválido <valor>`, `uso: bootstrap inválido (vazio)`, `uso: dht-host inválido`, `uso: falta o valor de --text`, `uso: opção desconhecida <flag>`. Um comando que recusa a própria linha escreve só `uso: <mensagem>`, sem repetir a ajuda: `uso: informe --text <texto>`, `uso: informe --seeder <hex>`, `uso: informe --cert-file <arquivo>`, `uso: node bin/varanda.js seed [key|cert add]`. Comando desconhecido sai 2 com `erro: comando desconhecido: <nome>`. |
