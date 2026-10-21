@@ -200,6 +200,22 @@ test('header keeps the authenticated suffix on row 1 and truncates the name (L1)
   t.ok(narrow.includes('  Ana'), 'name on its own indented row')
 })
 
+test('name room of 1 and 2 columns uses a short ASCII mark and keeps the real suffix (L1)', async (t) => {
+  await testnet(t)
+  const head = '[' + AT + '] '
+  const tail = ' (' + shortKey(KA) + ') #7'
+  const fixed = displayWidth(head) + displayWidth(tail)
+  const item = { author: KA, name: 'N'.repeat(60), seq: 7, at: AT, text: 'oi', replyTo: null }
+  for (const [room, mark] of [[1, '.'], [2, '..'], [3, '...']]) {
+    const width = fixed + room
+    const rows = formatFeedItem(item, { width }).split('\n')
+    t.is(rows.length, 2, 'room ' + room + ': single header row plus the text')
+    t.ok(rows[0].endsWith(tail), 'room ' + room + ': row 1 ends with the real key8 and seq')
+    t.is(rows[0], head + mark + tail, 'room ' + room + ': mark is ' + JSON.stringify(mark))
+    t.ok(displayWidth(rows[0]) <= width, 'room ' + room + ': row 1 fits width ' + width)
+  }
+})
+
 test('invalid blocks are skipped', async (t) => {
   await testnet(t)
   const logs = [
