@@ -1,0 +1,32 @@
+{
+  "name": "varanda-monorepo",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "lint": "standard",
+    "test": "npm test -w apps/cli --",
+    "demo": "npm run demo -w apps/cli --"
+  },
+  "devDependencies": {
+    "brittle": "4.5.0",
+    "standard": "17.1.2"
+  },
+  "standard": {
+    "ignore": [
+      "data/",
+      "demo-data/",
+      "apps/app/ios/",
+      "apps/app/android/",
+      "apps/app/dist/",
+      "apps/app/.expo/",
+      "**/*.bundle"
+    ]
+  }
+}
