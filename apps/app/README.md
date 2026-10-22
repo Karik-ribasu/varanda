@@ -1,11 +1,12 @@
 # @varanda/app
 
-O aplicativo Varanda para iOS, Android e web (Expo e React Native). A interface está em construção. O nó roda num worklet Bare dentro do app nativo; na web, a interface fala com o `varanda-serve`. Pacote privado do monorepo.
+O aplicativo Varanda para iOS, Android e web (Expo e React Native), com a interface de membro em português. O nó roda num worklet Bare dentro do app nativo; na web, a interface fala com o `varanda-serve`. Pacote privado do monorepo.
 
 Pontos de entrada:
 
-- `index.js` e `App.js`: a raiz do app e as telas.
-- `src/client/`: o cliente do nó. `index.native.js` usa o worklet (`native.js`, o único que importa `react-native-bare-kit`); `index.web.js` não importa o worklet (a web não tem nó no app; o cliente do `varanda-serve` está em construção).
+- `index.js` e `App.js`: a raiz do app e a barra de abas.
+- `src/screens/`: as telas (Conexão, Identidade, Perfil, Publicar, Seguindo, A Rua, Diário, Sincronizar); `src/node.js` guarda a conexão e o estado da sincronização; `src/config.js` valida a configuração.
+- `src/client/`: o cliente do nó. No app nativo, `connect.native.js` usa o worklet (`native.js`, o único que importa `react-native-bare-kit`); na web, `connect.web.js` usa `web.js`, que fala com o `varanda-serve` por WebSocket e nunca importa o worklet.
 - `worklet/main.js`: o código que roda no Bare e serve a sessão do `@varanda/core` por IPC.
 - `src/gate/` e `scripts/gate-server.js`: a prova do nó no simulador iOS ([docs/ios-gate.md](../../docs/ios-gate.md)).
 

@@ -7,7 +7,7 @@ Protótipo de fase 0 de uma rede social ponto a ponto no Holepunch (Hypercore, H
 É um monorepo npm (workspaces `packages/*` e `apps/*`, um só `package-lock.json` na raiz).
 
 - `apps/cli`: o programa de linha de comando (`varanda`, `varanda-serve`), o semeador e a demo. [README](apps/cli/README.md).
-- `apps/app`: aplicativo iOS, Android e web, com o worklet Bare que roda o nó (a interface está em construção). [README](apps/app/README.md).
+- `apps/app`: aplicativo iOS, Android e web, com o worklet Bare que roda o nó no celular e a interface de membro. [README](apps/app/README.md).
 - `packages/core`: o núcleo do protocolo e a sessão do nó, usados pelo CLI e pelo app (Node e Bare). [README](packages/core/README.md).
 - `packages/rpc`: o contrato JSON entre a interface e o nó. [README](packages/rpc/README.md).
 - `docs/`: `protocol.md` (referência normativa dos formatos), `rpc.md` (contrato da interface), `design.md` (documento de design), `development.md`, `app.md` e `ios-gate.md`. O índice está em [docs/README.md](docs/README.md).
