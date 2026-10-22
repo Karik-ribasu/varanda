@@ -2,7 +2,7 @@
 
 const test = require('brittle')
 const b4a = require('b4a')
-const records = require('../lib/records')
+const records = require('@varanda/core/lib/records')
 const { testnet } = require('./helpers/net')
 
 const {

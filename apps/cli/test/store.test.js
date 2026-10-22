@@ -5,8 +5,8 @@ const path = require('node:path')
 const { spawn, spawnSync } = require('node:child_process')
 const test = require('brittle')
 const b4a = require('b4a')
-const store = require('../lib/store')
-const { memberCertRecord, profileRecord, postRecord } = require('../lib/records')
+const store = require('@varanda/core/lib/store')
+const { memberCertRecord, profileRecord, postRecord } = require('@varanda/core/lib/records')
 const { testnet, tmpDir } = require('./helpers/net')
 
 const AT = '2026-01-01T00:00:00.000Z'
@@ -182,7 +182,7 @@ test('writeJsonAtomic: concurrent writers both succeed and one wins', async (t) 
   await testnet(t)
   const dir = tmpDir(t)
   const file = path.join(dir, 'config.json')
-  const script = 'const s = require(' + JSON.stringify(require.resolve('../lib/store')) + ');' +
+  const script = 'const s = require(' + JSON.stringify(require.resolve('@varanda/core/lib/store')) + ');' +
     'for (let i = 0; i < 200; i++) s.writeJsonAtomic(process.argv[1], { writer: process.argv[2], i })'
   const run = (name) => new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['-e', script, file, name], { stdio: ['ignore', 'ignore', 'pipe'] })
@@ -689,7 +689,7 @@ test('data-dir lock: 30 processes racing over a stale lock, one wins', async (t)
   age(lockDir(dir))
   const go = path.join(tmpDir(t), 'go')
   const script = 'const fs = require("node:fs");' +
-    'const s = require(' + JSON.stringify(require.resolve('../lib/store')) + ');' +
+    'const s = require(' + JSON.stringify(require.resolve('@varanda/core/lib/store')) + ');' +
     'const [dir, go] = process.argv.slice(1);' +
     'process.stdout.write("ready\\n");' +
     'const start = () => s.openStore(dir).then((st) => {' +
@@ -770,7 +770,7 @@ test('appendRecord refuses appends over the diary limits', async (t) => {
 test('data-dir lock: released on process exit without close', async (t) => {
   await testnet(t)
   const dir = tmpDir(t)
-  const code = 'require(' + JSON.stringify(require.resolve('../lib/store')) + ').openStore(' +
+  const code = 'require(' + JSON.stringify(require.resolve('@varanda/core/lib/store')) + ').openStore(' +
     JSON.stringify(dir) + ').then(() => process.exit(0))'
   const r = spawnSync(process.execPath, ['-e', code], { encoding: 'utf8', timeout: 60000 })
   t.is(r.status, 0, r.stderr)

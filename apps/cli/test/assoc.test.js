@@ -3,8 +3,8 @@ const path = require('node:path')
 const { spawn, spawnSync } = require('node:child_process')
 const test = require('brittle')
 const { testnet, tmpDir } = require('./helpers/net')
-const assoc = require('../lib/assoc')
-const cert = require('../lib/cert')
+const assoc = require('@varanda/core/lib/assoc')
+const cert = require('@varanda/core/lib/cert')
 
 const MEMBER = 'ab'.repeat(32)
 const SEEDER = 'ef'.repeat(32)
@@ -202,7 +202,7 @@ test('concurrent inits: exactly one wins and its key survives', async (t) => {
 test('concurrent inits across processes: exactly one wins', async (t) => {
   await testnet(t)
   const dir = tmpDir(t)
-  const script = 'const a = require(' + JSON.stringify(path.join(__dirname, '..', 'lib', 'assoc.js')) + ');' +
+  const script = 'const a = require(' + JSON.stringify(require.resolve('@varanda/core/lib/assoc')) + ');' +
     'try { process.stdout.write(JSON.stringify({ ok: a.initAssociation(process.argv[1]).publicKey })) }' +
     ' catch (err) { process.stdout.write(JSON.stringify({ code: err.code })) }'
   const run = () => new Promise((resolve, reject) => {

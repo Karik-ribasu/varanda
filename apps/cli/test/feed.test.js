@@ -1,9 +1,9 @@
 'use strict'
 
 const test = require('brittle')
-const { buildFeed, shortKey, formatFeedItem, MAX_FUTURE_MS } = require('../lib/feed')
+const { buildFeed, shortKey, formatFeedItem, MAX_FUTURE_MS } = require('@varanda/core/lib/feed')
 const { testnet } = require('./helpers/net')
-const { displayWidth } = require('../lib/safe')
+const { displayWidth } = require('@varanda/core/lib/safe')
 const { feedWidth } = require('../lib/commands/member')
 
 const KA = 'a'.repeat(64)

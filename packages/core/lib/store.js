@@ -1,8 +1,9 @@
 'use strict'
 
-const fs = require('node:fs')
-const path = require('node:path')
-const crypto = require('node:crypto')
+const fs = require('#fs')
+const path = require('#path')
+const process = require('#process')
+const { randomBytes } = require('hypercore-crypto')
 const b4a = require('b4a')
 const Corestore = require('corestore')
 const { validateRecord, decodeBlock, MAX_BLOCK_BYTES, MAX_LOG_BLOCKS, MAX_LOG_BYTES } = require('./records')
@@ -192,7 +193,7 @@ function takeOverLock (lockDir, stale, token) {
   if (!tryMutex(mutex, token)) return false
   try {
     if (!sameLock(inspectLock(lockDir), stale)) return true
-    const aside = lockDir + '.stale-' + crypto.randomBytes(6).toString('hex')
+    const aside = lockDir + '.stale-' + b4a.toString(randomBytes(6), 'hex')
     try {
       fs.renameSync(lockDir, aside)
     } catch (err) {
@@ -223,7 +224,7 @@ function takeOverLock (lockDir, stale, token) {
 // once. Returns { lockDir, token } for this acquisition.
 async function acquireLock (dataDir) {
   const lockDir = path.join(dataDir, LOCK_DIR)
-  const token = crypto.randomBytes(16).toString('hex')
+  const token = b4a.toString(randomBytes(16), 'hex')
   const waitUntil = Date.now() + LOCK_WAIT_MS
   for (;;) {
     try {
@@ -445,7 +446,7 @@ function readJson (file, fallback) {
 function writeJsonAtomic (file, obj, mode) {
   const dir = path.dirname(file)
   fs.mkdirSync(dir, { recursive: true })
-  const tmp = path.join(dir, '.' + path.basename(file) + '.' + process.pid + '.' + crypto.randomBytes(6).toString('hex') + '.tmp')
+  const tmp = path.join(dir, '.' + path.basename(file) + '.' + process.pid + '.' + b4a.toString(randomBytes(6), 'hex') + '.tmp')
   const { O_WRONLY, O_CREAT, O_EXCL, O_NOFOLLOW } = fs.constants
   const fd = fs.openSync(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, mode === undefined ? 0o666 : mode)
   let published = false

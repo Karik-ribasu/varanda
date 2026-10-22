@@ -2,8 +2,8 @@
 // sections 1, 3, 4 and 5). A log is kept only when its block 0 is a valid
 // member certificate for the trusted association; until then its block 0 is
 // fetched through the quarantine store and never opened in the main store.
-const fs = require('node:fs')
-const path = require('node:path')
+const fs = require('#fs')
+const path = require('#path')
 const b4a = require('b4a')
 const crypto = require('hypercore-crypto')
 const {
@@ -39,7 +39,7 @@ const {
   writeJsonAtomic
 } = require('./store')
 const { validateRecord, decodeBlock, MAX_LOG_BLOCKS, MAX_LOG_BYTES } = require('./records')
-const { UsageError } = require('./cli')
+const { UsageError } = require('./errors')
 
 const GATE_TIMEOUT_MS = 15000
 const REDISCOVER_MS = 10000

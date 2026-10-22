@@ -1,0 +1,169 @@
+'use strict'
+
+const test = require('brittle')
+const { validateParams, METHODS, MUTATING, isMutating, MAX_NAME, MAX_BIO, MAX_TEXT, LOG_LIMIT_MAX, FEED_LIMIT_MAX } = require('..')
+
+const KEY = 'ab'.repeat(32)
+const ok = (t, method, params, expected) => {
+  const r = validateParams(method, params)
+  t.ok(r.ok, method + ' ' + JSON.stringify(params))
+  if (expected !== undefined) t.alike(r.value, expected)
+}
+const bad = (t, method, params, label) => {
+  const r = validateParams(method, params)
+  t.absent(r.ok, method + ' ' + (label || JSON.stringify(params)))
+  t.is(r.code, 'USAGE')
+}
+
+test('method list and mutating set', (t) => {
+  t.alike([...METHODS].sort(), [
+    'cert.add', 'feed.read', 'follow.add', 'follow.list', 'follow.remove', 'identity.create',
+    'identity.show', 'log.read', 'node.info', 'post.create', 'post.reply', 'profile.set',
+    'session.open', 'sync.start', 'sync.status', 'sync.stop'
+  ])
+  t.alike([...MUTATING].sort(), [
+    'cert.add', 'follow.add', 'follow.remove', 'identity.create', 'post.create', 'post.reply',
+    'profile.set', 'sync.start', 'sync.stop'
+  ])
+})
+
+test('no-param methods reject any key', (t) => {
+  for (const m of ['node.info', 'identity.create', 'identity.show', 'sync.stop', 'sync.status']) {
+    ok(t, m, {}, {})
+    bad(t, m, { x: 1 })
+    // No method takes node configuration.
+    for (const k of ['dataDir', 'path', 'association', 'bootstrap', 'host', 'secretKey', 'maxLogBlocks']) bad(t, m, { [k]: 'x' })
+  }
+})
+
+test('session.open', (t) => {
+  ok(t, 'session.open', {}, {})
+  ok(t, 'session.open', { token: 'a' })
+  ok(t, 'session.open', { token: 'a'.repeat(256) })
+  bad(t, 'session.open', { token: '' })
+  bad(t, 'session.open', { token: 'a'.repeat(257) })
+  bad(t, 'session.open', { token: 1 })
+  bad(t, 'session.open', { token: 'a', x: 1 })
+})
+
+test('cert.add', (t) => {
+  ok(t, 'cert.add', { cert: { v: 1 } })
+  bad(t, 'cert.add', {})
+  bad(t, 'cert.add', { cert: [] })
+  bad(t, 'cert.add', { cert: 'x' })
+  bad(t, 'cert.add', { cert: null })
+  bad(t, 'cert.add', { cert: { pad: 'x'.repeat(4096) } }, 'oversized cert')
+  bad(t, 'cert.add', { cert: {}, file: 'x' })
+})
+
+test('profile.set', (t) => {
+  ok(t, 'profile.set', { name: 'Ana' }, { name: 'Ana', bio: '' })
+  ok(t, 'profile.set', { name: 'Ana', bio: 'oi' }, { name: 'Ana', bio: 'oi' })
+  ok(t, 'profile.set', { name: '😀'.repeat(MAX_NAME) }, undefined)
+  ok(t, 'profile.set', { name: 'a', bio: 'b'.repeat(MAX_BIO) })
+  bad(t, 'profile.set', {})
+  bad(t, 'profile.set', { name: '' })
+  bad(t, 'profile.set', { name: 'a'.repeat(MAX_NAME + 1) })
+  bad(t, 'profile.set', { name: '😀'.repeat(MAX_NAME + 1) })
+  bad(t, 'profile.set', { name: 'a', bio: 'b'.repeat(MAX_BIO + 1) })
+  bad(t, 'profile.set', { name: 1 })
+  bad(t, 'profile.set', { name: 'a', bio: null })
+  bad(t, 'profile.set', { name: 'a', at: 'x' })
+})
+
+test('post.create and post.reply', (t) => {
+  ok(t, 'post.create', { text: 'olá' }, { text: 'olá' })
+  ok(t, 'post.create', { text: 'x'.repeat(MAX_TEXT) })
+  bad(t, 'post.create', {})
+  bad(t, 'post.create', { text: '' })
+  bad(t, 'post.create', { text: 'x'.repeat(MAX_TEXT + 1) })
+  bad(t, 'post.create', { text: 'x', replyTo: null })
+  ok(t, 'post.reply', { to: KEY + ':1', text: 'x' })
+  ok(t, 'post.reply', { to: KEY + ':9007199254740991', text: 'x' })
+  bad(t, 'post.reply', { to: KEY + ':0', text: 'x' }, 'seq 0')
+  bad(t, 'post.reply', { to: KEY + ':01', text: 'x' }, 'leading zero')
+  bad(t, 'post.reply', { to: KEY + ':9007199254740992', text: 'x' }, 'unsafe seq')
+  bad(t, 'post.reply', { to: KEY.toUpperCase() + ':1', text: 'x' }, 'uppercase')
+  bad(t, 'post.reply', { to: KEY, text: 'x' })
+  bad(t, 'post.reply', { to: KEY + ':1' })
+  bad(t, 'post.reply', { text: 'x' })
+  bad(t, 'post.reply', { to: { author: KEY, seq: 1 }, text: 'x' })
+})
+
+test('follow.*', (t) => {
+  for (const m of ['follow.add', 'follow.remove']) {
+    ok(t, m, { key: KEY }, { key: KEY })
+    bad(t, m, {})
+    bad(t, m, { key: KEY.toUpperCase() })
+    bad(t, m, { key: KEY.slice(1) })
+    bad(t, m, { key: KEY + '0' })
+    bad(t, m, { key: KEY, author: KEY })
+  }
+})
+
+test('follow.list', (t) => {
+  ok(t, 'follow.list', {}, { offset: 0, limit: 100 })
+  ok(t, 'follow.list', { offset: 4000, limit: 500 }, { offset: 4000, limit: 500 })
+  ok(t, 'follow.list', { limit: 1 }, { offset: 0, limit: 1 })
+  bad(t, 'follow.list', { offset: -1 })
+  bad(t, 'follow.list', { offset: 1.5 })
+  bad(t, 'follow.list', { limit: 0 })
+  bad(t, 'follow.list', { limit: 501 })
+  bad(t, 'follow.list', { key: KEY })
+})
+
+test('isMutating and a frozen MUTATING', (t) => {
+  t.ok(isMutating('follow.add'))
+  t.absent(isMutating('follow.list'))
+  t.absent(isMutating('nope'))
+  t.ok(Array.isArray(MUTATING))
+  t.ok(Object.isFrozen(MUTATING))
+  try { MUTATING.push('follow.list') } catch {}
+  t.absent(isMutating('follow.list'), 'consumers cannot add a method')
+})
+
+test('log.read', (t) => {
+  ok(t, 'log.read', {}, { limit: 20 })
+  ok(t, 'log.read', { author: KEY, limit: LOG_LIMIT_MAX }, { author: KEY, limit: LOG_LIMIT_MAX })
+  ok(t, 'log.read', { limit: 1 }, { limit: 1 })
+  bad(t, 'log.read', { limit: 0 })
+  bad(t, 'log.read', { limit: LOG_LIMIT_MAX + 1 })
+  bad(t, 'log.read', { limit: 1.5 })
+  bad(t, 'log.read', { limit: '5' })
+  bad(t, 'log.read', { author: 'x' })
+  bad(t, 'log.read', { author: KEY, offset: 1 })
+})
+
+test('feed.read', (t) => {
+  ok(t, 'feed.read', {}, { limit: 30 })
+  ok(t, 'feed.read', { limit: FEED_LIMIT_MAX }, { limit: FEED_LIMIT_MAX })
+  bad(t, 'feed.read', { limit: FEED_LIMIT_MAX + 1 })
+  bad(t, 'feed.read', { limit: 0 })
+  bad(t, 'feed.read', { limit: null })
+  bad(t, 'feed.read', { limit: 5, author: KEY })
+})
+
+test('sync.start', (t) => {
+  ok(t, 'sync.start', {}, { once: false })
+  ok(t, 'sync.start', { once: false }, { once: false })
+  ok(t, 'sync.start', { once: true }, { once: true, timeoutMs: 30000 })
+  ok(t, 'sync.start', { once: true, timeoutMs: 1000 }, { once: true, timeoutMs: 1000 })
+  ok(t, 'sync.start', { once: true, timeoutMs: 600000 })
+  bad(t, 'sync.start', { once: true, timeoutMs: 999 })
+  bad(t, 'sync.start', { once: true, timeoutMs: 600001 })
+  bad(t, 'sync.start', { timeoutMs: 5000 }, 'timeoutMs without once')
+  bad(t, 'sync.start', { once: false, timeoutMs: 5000 })
+  bad(t, 'sync.start', { once: 'yes' })
+  bad(t, 'sync.start', { once: true, bootstrap: ['x'] })
+})
+
+test('unknown method and non-object params', (t) => {
+  bad(t, 'nope', {})
+  bad(t, 'node.info', [])
+  bad(t, 'node.info', null)
+})
+
+test('messages never echo the value', (t) => {
+  const r = validateParams('follow.add', { key: '/home/secret' })
+  t.absent(r.message.includes('/home'))
+})

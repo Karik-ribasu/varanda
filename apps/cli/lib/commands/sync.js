@@ -1,5 +1,5 @@
-const { runSync } = require('../sync')
-const { safe, jsonLine } = require('../safe')
+const { runSync } = require('@varanda/core/lib/sync')
+const { safe, jsonLine } = require('@varanda/core/lib/safe')
 
 const LF = '\n'
 

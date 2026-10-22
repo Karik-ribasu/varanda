@@ -5,7 +5,7 @@ const test = require('brittle')
 const b4a = require('b4a')
 const crypto = require('hypercore-crypto')
 const { testnet, tmpDir } = require('./helpers/net')
-const cert = require('../lib/cert')
+const cert = require('@varanda/core/lib/cert')
 
 const LF = '\n'
 const MEMBER = 'ab'.repeat(32)

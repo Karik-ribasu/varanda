@@ -1,0 +1,30 @@
+{
+  "name": "@varanda/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Núcleo do protocolo Varanda: registros, certificados, armazenamento, rede e sincronização",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./lib/*": "./lib/*.js",
+    "./package.json": "./package.json"
+  },
+  "imports": {
+    "#fs": "./lib/node/fs.js",
+    "#path": "./lib/node/path.js",
+    "#process": "./lib/node/process.js"
+  },
+  "dependencies": {
+    "b4a": "1.9.0",
+    "compact-encoding": "3.5.2",
+    "corestore": "7.15.0",
+    "hypercore": "11.39.0",
+    "hypercore-crypto": "3.7.0",
+    "hyperdht": "6.34.1",
+    "hyperswarm": "4.17.2"
+  }
+}

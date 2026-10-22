@@ -93,7 +93,7 @@ O certificado tem exatamente estas chaves: `v` (1), `member` (chave pública do 
 
 Faixas sugeridas: `13-15`, `16-17`, `18+`. O padrão de `assoc certify` é `--age-band 18+` e `--method stub`. `ageBand` casa com `/^[a-z0-9+-]{1,32}$/`; `method` casa com `/^[a-z0-9-]{1,32}$/`.
 
-A associação guarda, por membro, só a chave pública, a faixa etária, o método e a data (`members.jsonl`). Não guarda assinatura, chave secreta, imagem nem documento. Quem opera `assoc certify` afirma a faixa etária. A checagem de idade de um provedor real está fora desta fase (comentário `TODO(phase1)` em `apps/cli/lib/assoc.js`).
+A associação guarda, por membro, só a chave pública, a faixa etária, o método e a data (`members.jsonl`). Não guarda assinatura, chave secreta, imagem nem documento. Quem opera `assoc certify` afirma a faixa etária. A checagem de idade de um provedor real está fora desta fase (comentário `TODO(phase1)` em `packages/core/lib/assoc.js`).
 
 ### Certificado de semeador
 
@@ -151,7 +151,7 @@ Não misture papéis no mesmo diretório. Comando de membro em diretório de sem
 
 ### Publicação no futuro e diário reescrito
 
-Uma publicação válida cuja data `at` está mais de 24 horas à frente do relógio de quem lê (`MAX_FUTURE_MS` = 86400000 em `apps/cli/lib/feed.js`) fica de fora do feed. O comando avisa em stderr `aviso: publicação <chave>:<seq> ignorada (future)`. Ela volta sozinha quando o relógio do leitor chega em `at` menos 24 horas. Publicação no passado permanece e afunda na ordem `(at, autor, seq)`. O corte é pular, não redatar: redatar mudaria a posição em cada leitor e em cada execução.
+Uma publicação válida cuja data `at` está mais de 24 horas à frente do relógio de quem lê (`MAX_FUTURE_MS` = 86400000 em `packages/core/lib/feed.js`) fica de fora do feed. O comando avisa em stderr `aviso: publicação <chave>:<seq> ignorada (future)`. Ela volta sozinha quando o relógio do leitor chega em `at` menos 24 horas. Publicação no passado permanece e afunda na ordem `(at, autor, seq)`. O corte é pular, não redatar: redatar mudaria a posição em cada leitor e em cada execução.
 
 Nenhum escritor desta fase trunca o diário. Se `fork` deixa de ser zero, o detentor da chave reescreveu o histórico. Esse diário é descartado em todo lugar, motivo `fork`: o semeador para de servi-lo, o `sync` apaga a réplica e o `feed` avisa `aviso: diário <8 hex> ignorado (fork)`. O `feed` só lê; o próximo `sync` é que apaga a cópia local.
 
@@ -331,7 +331,7 @@ npm run lint
 node apps/cli/test/smoke.test.js
 ```
 
-`npm test` roda, dentro de `apps/cli`, `node scripts/run-tests.js`, que executa cada `test/*.test.js` desse diretório em sequência. Um arquivo sozinho, a partir da raiz:
+`npm test` roda, dentro de `apps/cli`, `node ../../scripts/run-tests.js`, que executa cada `test/*.test.js` desse diretório em sequência. Um arquivo sozinho, a partir da raiz:
 
 ```sh
 node apps/cli/test/assoc.test.js
@@ -464,13 +464,13 @@ Limites desta fase:
 
 Fora desta fase:
 
-- Verificação de idade real. Hoje o operador de `assoc certify` afirma `--age-band`. Comentário `TODO(phase1): the real age-check vendor decides here; today the operator asserts the age band.` em `apps/cli/lib/assoc.js`. O mesmo limite está em `docs/protocol.md` (certificados).
-- Notificações push quando um diário seguido cresce. Comentário `TODO(phase1): push notifications when a followed log grows.` em `apps/cli/lib/sync.js` e em `docs/protocol.md` (sync).
+- Verificação de idade real. Hoje o operador de `assoc certify` afirma `--age-band`. Comentário `TODO(phase1): the real age-check vendor decides here; today the operator asserts the age band.` em `packages/core/lib/assoc.js`. O mesmo limite está em `docs/protocol.md` (certificados).
+- Notificações push quando um diário seguido cresce. Comentário `TODO(phase1): push notifications when a followed log grows.` em `packages/core/lib/sync.js` e em `docs/protocol.md` (sync).
 - Recuperação da chave do diário com chaves limiar FROST. Comentário `TODO(phase2): threshold-key (FROST) recovery of this key.` em `docs/protocol.md` (identidade). A chave fica no `store/` deste dispositivo.
-- Listas de moderação e revogação. Certificado de membro e certificado de semeador não expiram e não são revogados nesta fase. Comentários `TODO(phase2): moderation lists — consult a block list before admitting.` e `TODO(phase2): certificate revocation list.` em `apps/cli/lib/seeder.js`. Também `TODO(later): media attachments and moderation lists are out of scope for phase 0.` em `apps/cli/lib/records.js`, e os `TODO(phase2)` / `TODO(later phases)` correspondentes em `docs/protocol.md` (registros, certificados e admissão).
-- Mídia. Publicação é só texto, até 1000 caracteres. O comentário de `apps/cli/lib/records.js` citado acima, e `docs/protocol.md` (registros), deixam anexos para uma fase posterior.
+- Listas de moderação e revogação. Certificado de membro e certificado de semeador não expiram e não são revogados nesta fase. Comentários `TODO(phase2): moderation lists — consult a block list before admitting.` e `TODO(phase2): certificate revocation list.` em `packages/core/lib/seeder.js`. Também `TODO(later): media attachments and moderation lists are out of scope for phase 0.` em `packages/core/lib/records.js`, e os `TODO(phase2)` / `TODO(later phases)` correspondentes em `docs/protocol.md` (registros, certificados e admissão).
+- Mídia. Publicação é só texto, até 1000 caracteres. O comentário de `packages/core/lib/records.js` citado acima, e `docs/protocol.md` (registros), deixam anexos para uma fase posterior.
 - Empacotamento Pear ou Bare, e interface gráfica. O protótipo é um programa Node. Não há comentário `TODO` no código para esse empacotamento.
-- Relay de certificados por seguidores. O `sync` anuncia só o próprio diário (`apps/cli/lib/sync.js` envia `announce` da chave local e ignora `announce` recebido). Um seguidor não apresenta ao semeador o certificado de outra pessoa. Se a autora nunca sincronizou, o semeador não tem a cópia, mesmo que um seguidor já a tenha. Não há comentário `TODO` no código para esse relay. `docs/protocol.md` registra que o `announce` permanece sem autenticação de propósito: qualquer par pode pedir a admissão, e só entra o diário cujo bloco 0 passa na verificação.
+- Relay de certificados por seguidores. O `sync` anuncia só o próprio diário (`packages/core/lib/sync.js` envia `announce` da chave local e ignora `announce` recebido). Um seguidor não apresenta ao semeador o certificado de outra pessoa. Se a autora nunca sincronizou, o semeador não tem a cópia, mesmo que um seguidor já a tenha. Não há comentário `TODO` no código para esse relay. `docs/protocol.md` registra que o `announce` permanece sem autenticação de propósito: qualquer par pode pedir a admissão, e só entra o diário cujo bloco 0 passa na verificação.
 
 ## Códigos de saída
 

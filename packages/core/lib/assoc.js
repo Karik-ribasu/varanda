@@ -1,6 +1,6 @@
 // Association data dir: key pair, certificate issuing and audit logs (docs/protocol.md section 1).
-const fs = require('node:fs')
-const path = require('node:path')
+const fs = require('#fs')
+const path = require('#path')
 const b4a = require('b4a')
 const cert = require('./cert')
 

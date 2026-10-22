@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "lint": "standard",
-    "test": "npm test -w apps/cli --",
+    "test": "npm test --workspaces --if-present",
     "demo": "npm run demo -w apps/cli --"
   },
   "devDependencies": {

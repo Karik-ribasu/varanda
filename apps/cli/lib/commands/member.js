@@ -6,7 +6,7 @@ const crypto = require('node:crypto')
 const util = require('node:util')
 const b4a = require('b4a')
 const { discoveryKey } = require('hypercore-crypto')
-const { certForKey } = require('../cert')
+const { certForKey } = require('@varanda/core/lib/cert')
 const {
   decodeBlock,
   memberCertRecord,
@@ -14,8 +14,8 @@ const {
   postRecord,
   validateRecord,
   formatRef
-} = require('../records')
-const { MAX_INVENTORY } = require('../net')
+} = require('@varanda/core/lib/records')
+const { MAX_INVENTORY } = require('@varanda/core/lib/net')
 const {
   openStore,
   storeExists,
@@ -27,9 +27,9 @@ const {
   readConfig,
   readFollows,
   writeFollows
-} = require('../store')
-const { buildFeed, shortKey, formatFeedItem } = require('../feed')
-const { safe, jsonLine } = require('../safe')
+} = require('@varanda/core/lib/store')
+const { buildFeed, shortKey, formatFeedItem } = require('@varanda/core/lib/feed')
+const { safe, jsonLine } = require('@varanda/core/lib/safe')
 
 const HEX64 = /^[0-9a-fA-F]{64}$/
 const GENESIS_REQUIRED = 'grave o certificado de membro antes de publicar'

@@ -1,7 +1,7 @@
 'use strict'
 
 const fs = require('node:fs')
-const { initAssociation, showAssociation, issueCertificate, issueSeederCertificate } = require('../assoc')
+const { initAssociation, showAssociation, issueCertificate, issueSeederCertificate } = require('@varanda/core/lib/assoc')
 
 function usage (message) {
   const err = new Error(message)

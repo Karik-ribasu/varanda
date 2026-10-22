@@ -1,9 +1,8 @@
 // Membership and seeder certificates (docs/protocol.md section 3) and key pair files.
-const fs = require('node:fs')
-const path = require('node:path')
+const fs = require('#fs')
+const path = require('#path')
 const b4a = require('b4a')
 const crypto = require('hypercore-crypto')
-const nodeCrypto = require('node:crypto')
 
 const LF = '\n'
 const MEMBER_PREFIX = 'varanda-cert-v1'
@@ -256,7 +255,7 @@ function saveKeyPairFile (file, kp, { overwrite = false } = {}) {
     publicKey: b4a.toString(kp.publicKey, 'hex'),
     secretKey: b4a.toString(kp.secretKey, 'hex')
   }, null, 2) + LF
-  const tmp = path.join(dir, '.' + path.basename(file) + '.' + nodeCrypto.randomBytes(12).toString('hex') + '.tmp')
+  const tmp = path.join(dir, '.' + path.basename(file) + '.' + b4a.toString(crypto.randomBytes(12), 'hex') + '.tmp')
   const fd = fs.openSync(tmp, 'wx', 0o600)
   try {
     try {

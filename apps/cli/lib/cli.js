@@ -1,4 +1,5 @@
 const path = require('node:path')
+const { UsageError } = require('@varanda/core/lib/errors')
 
 const HELP = `varanda — protótipo de rede social P2P (fase 0)
 Uso: node bin/varanda.js <comando> [subcomando] [opções]
@@ -33,13 +34,6 @@ const stringFlags = new Set([
   '--age-band', '--method', '--out', '--cert-file', '--name', '--bio',
   '--text', '--to', '--author', '--limit', '--bootstrap', '--dht-host'
 ])
-
-class UsageError extends Error {
-  constructor (message) {
-    super(message)
-    this.code = 'USAGE'
-  }
-}
 
 function key (value, message = 'chave inválida') {
   if (value == null) return null

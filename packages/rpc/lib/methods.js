@@ -1,0 +1,170 @@
+'use strict'
+
+const { utf8ByteLength, charLength } = require('./text')
+const L = require('./limits')
+
+const HEX64 = /^[0-9a-f]{64}$/
+const REF = /^([0-9a-f]{64}):(0|[1-9][0-9]*)$/
+
+function isPlainObject (v) {
+  if (v === null || typeof v !== 'object') return false
+  const proto = Object.getPrototypeOf(v)
+  return proto === Object.prototype || proto === null
+}
+
+function hasOwn (obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj, key)
+}
+
+function isId (v) {
+  return Number.isSafeInteger(v) && v >= 1 && v <= L.MAX_ID
+}
+
+function isKey (v) {
+  return typeof v === 'string' && HEX64.test(v)
+}
+
+// '<hex64>:<seq>' with lowercase hex, canonical decimal and seq >= minSeq.
+function isRef (v, minSeq = 1) {
+  if (typeof v !== 'string') return false
+  const m = REF.exec(v)
+  if (!m) return false
+  const seq = Number(m[2])
+  return Number.isSafeInteger(seq) && String(seq) === m[2] && seq >= minSeq
+}
+
+function str (min, max) {
+  return (v) => typeof v === 'string' && charLength(v) >= min && charLength(v) <= max
+}
+
+function int (min, max) {
+  return (v) => Number.isSafeInteger(v) && v >= min && v <= max
+}
+
+const isBool = (v) => typeof v === 'boolean'
+
+function isCert (v) {
+  if (!isPlainObject(v)) return false
+  return utf8ByteLength(JSON.stringify(v)) <= L.MAX_CERT_BYTES
+}
+
+// field(check, { optional, fallback }): `fallback` is filled in when the
+// field is absent (the handler always sees it).
+function req (check) {
+  return { check, optional: false }
+}
+
+function opt (check, fallback) {
+  return { check, optional: true, fallback }
+}
+
+const none = {}
+
+// method -> { fields, mutating, cross? }. Every params object has exactly
+// a subset of `fields` (all required ones present).
+const SPECS = {
+  'session.open': { fields: { token: opt(str(1, L.MAX_TOKEN)) } },
+  'node.info': { fields: none },
+  'identity.create': { fields: none, mutating: true },
+  'identity.show': { fields: none },
+  'cert.add': { fields: { cert: req(isCert) }, mutating: true },
+  'profile.set': {
+    fields: { name: req(str(1, L.MAX_NAME)), bio: opt(str(0, L.MAX_BIO), '') },
+    mutating: true
+  },
+  'post.create': { fields: { text: req(str(1, L.MAX_TEXT)) }, mutating: true },
+  'post.reply': {
+    fields: { to: req((v) => isRef(v, 1)), text: req(str(1, L.MAX_TEXT)) },
+    mutating: true
+  },
+  'follow.add': { fields: { key: req(isKey) }, mutating: true },
+  'follow.remove': { fields: { key: req(isKey) }, mutating: true },
+  'follow.list': {
+    fields: {
+      offset: opt(int(0, Number.MAX_SAFE_INTEGER), 0),
+      limit: opt(int(1, L.FOLLOW_LIMIT_MAX), L.FOLLOW_LIMIT_DEFAULT)
+    }
+  },
+  'log.read': {
+    fields: {
+      author: opt(isKey),
+      limit: opt(int(1, L.LOG_LIMIT_MAX), L.LOG_LIMIT_DEFAULT)
+    }
+  },
+  'feed.read': { fields: { limit: opt(int(1, L.FEED_LIMIT_MAX), L.FEED_LIMIT_DEFAULT) } },
+  'sync.start': {
+    fields: {
+      once: opt(isBool, false),
+      timeoutMs: opt(int(L.SYNC_TIMEOUT_MIN, L.SYNC_TIMEOUT_MAX))
+    },
+    mutating: true,
+    cross (given, value) {
+      if (hasOwn(given, 'timeoutMs') && value.once !== true) return 'timeoutMs só com once'
+      if (value.once === true && !hasOwn(given, 'timeoutMs')) value.timeoutMs = L.SYNC_TIMEOUT_DEFAULT
+      return null
+    }
+  },
+  'sync.stop': { fields: none, mutating: true },
+  'sync.status': { fields: none }
+}
+
+const METHODS = Object.freeze(Object.keys(SPECS))
+const MUTATING = Object.freeze(METHODS.filter((m) => SPECS[m].mutating === true))
+
+function isMethod (method) {
+  return typeof method === 'string' && hasOwn(SPECS, method)
+}
+
+function isMutating (method) {
+  return MUTATING.includes(method)
+}
+
+function fail (message) {
+  return { ok: false, code: 'USAGE', message }
+}
+
+// Validates the params of a known method and returns a fresh normalized
+// copy (defaults filled in). Messages name the field, never echo a value.
+// Never throws.
+function validateParams (method, params) {
+  try {
+    if (!isMethod(method)) return fail('método desconhecido')
+    if (!isPlainObject(params)) return fail('params inválidos')
+    const spec = SPECS[method]
+    for (const key of Object.keys(params)) {
+      if (!hasOwn(spec.fields, key)) return fail('parâmetro desconhecido')
+    }
+    const value = {}
+    for (const name of Object.keys(spec.fields)) {
+      const field = spec.fields[name]
+      if (!hasOwn(params, name)) {
+        if (!field.optional) return fail('parâmetro obrigatório: ' + name)
+        if (field.fallback !== undefined) value[name] = field.fallback
+        continue
+      }
+      const v = params[name]
+      if (!field.check(v)) return fail('parâmetro inválido: ' + name)
+      value[name] = v
+    }
+    if (spec.cross) {
+      const message = spec.cross(params, value)
+      if (message !== null) return fail(message)
+    }
+    return { ok: true, value }
+  } catch {
+    return fail('params inválidos')
+  }
+}
+
+module.exports = {
+  METHODS,
+  MUTATING,
+  isMethod,
+  isMutating,
+  validateParams,
+  isPlainObject,
+  hasOwn,
+  isId,
+  isKey,
+  isRef
+}

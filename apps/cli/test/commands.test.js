@@ -8,9 +8,9 @@ const { spawn, spawnSync } = require('node:child_process')
 const b4a = require('b4a')
 const { discoveryKey } = require('hypercore-crypto')
 const { testnet, tmpDir } = require('./helpers/net')
-const { verifySeederCert, verifyCert } = require('../lib/cert')
-const { openStore, openDiary, appendRecord } = require('../lib/store')
-const { postRecord } = require('../lib/records')
+const { verifySeederCert, verifyCert } = require('@varanda/core/lib/cert')
+const { openStore, openDiary, appendRecord } = require('@varanda/core/lib/store')
+const { postRecord } = require('@varanda/core/lib/records')
 
 const BIN = path.join(__dirname, '..', 'bin', 'varanda.js')
 const HEX64 = /^[0-9a-f]{64}$/
@@ -222,7 +222,7 @@ test('member commands', async (t) => {
 
 test('follow refuses when follows.json already holds MAX_INVENTORY - 1 keys (item 4b)', async (t) => {
   await testnet(t)
-  const { MAX_INVENTORY } = require('../lib/net')
+  const { MAX_INVENTORY } = require('@varanda/core/lib/net')
   const dir = tmpDir(t)
   t.is(varanda(dir, ['id', 'create', '--association', 'c'.repeat(64)]).code, 0)
   const follows = []

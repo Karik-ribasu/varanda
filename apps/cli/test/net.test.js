@@ -23,8 +23,8 @@ const {
   MAX_CONNECTIONS,
   MAX_FETCH_ATTACHMENTS,
   MAX_SEND_BACKLOG
-} = require('../lib/net')
-const { MAX_LOG_BLOCKS } = require('../lib/records')
+} = require('@varanda/core/lib/net')
+const { MAX_LOG_BLOCKS } = require('@varanda/core/lib/records')
 
 const DUMMY_SEEDER_CERT = { v: 1, seeder: 'cd'.repeat(32), date: '2026-01-01T00:00:00.000Z', association: 'ab'.repeat(32), signature: 'ef'.repeat(64) }
 const TOPIC = topicFor('ab'.repeat(32))

@@ -1,8 +1,8 @@
 'use strict'
 
-const { Seeder } = require('../seeder')
+const { Seeder } = require('@varanda/core/lib/seeder')
 const { UsageError } = require('../cli')
-const { safe, jsonLine } = require('../safe')
+const { safe, jsonLine } = require('@varanda/core/lib/safe')
 
 function print (flags, result, line) {
   process.stdout.write((flags.json ? jsonLine(result) : line) + '\n')

@@ -13,6 +13,7 @@
 //   failing  gate failed or fork: its close + purge is in flight (completion
 //            is blocked until the purge settles)
 //   failed   skipped; excluded from every goal
+const process = require('#process')
 const b4a = require('b4a')
 const Hypercore = require('hypercore')
 const {

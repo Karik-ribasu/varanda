@@ -4,7 +4,7 @@ const path = require('node:path')
 const b4a = require('b4a')
 const Corestore = require('corestore')
 const { testnet, tmpDir, until, localSwarmOptions } = require('./helpers/net')
-const { runSync } = require('../lib/sync')
+const { runSync } = require('@varanda/core/lib/sync')
 const { formatEvent } = require('../lib/commands/sync')
 const {
   openStore,
@@ -15,11 +15,11 @@ const {
   appendRecord,
   writeConfig,
   writeFollows
-} = require('../lib/store')
-const { memberCertRecord, profileRecord, postRecord, MAX_LOG_BLOCKS } = require('../lib/records')
+} = require('@varanda/core/lib/store')
+const { memberCertRecord, profileRecord, postRecord, MAX_LOG_BLOCKS } = require('@varanda/core/lib/records')
 const c = require('compact-encoding')
 const Hypercore = require('hypercore')
-const { createCert, createSeederCert, certForKey, generateAssociationKeyPair } = require('../lib/cert')
+const { createCert, createSeederCert, certForKey, generateAssociationKeyPair } = require('@varanda/core/lib/cert')
 const {
   createSwarm,
   topicFor,
@@ -27,7 +27,7 @@ const {
   attachAdmission,
   watchContiguous,
   generateNoiseKeyPair
-} = require('../lib/net')
+} = require('@varanda/core/lib/net')
 
 function hex (buf) {
   return b4a.toString(buf, 'hex')

@@ -10,12 +10,12 @@ const path = require('node:path')
 const b4a = require('b4a')
 const Corestore = require('corestore')
 const { testnet, tmpDir, until, localSwarmOptions } = require('./helpers/net')
-const { Seeder } = require('../lib/seeder')
-const { runSync } = require('../lib/sync')
-const { createCert, createSeederCert, generateAssociationKeyPair } = require('../lib/cert')
-const { createSwarm, joinAndFlush, topicFor, attachAdmission } = require('../lib/net')
-const { memberCertRecord, profileRecord, postRecord } = require('../lib/records')
-const { buildFeed } = require('../lib/feed')
+const { Seeder } = require('@varanda/core/lib/seeder')
+const { runSync } = require('@varanda/core/lib/sync')
+const { createCert, createSeederCert, generateAssociationKeyPair } = require('@varanda/core/lib/cert')
+const { createSwarm, joinAndFlush, topicFor, attachAdmission } = require('@varanda/core/lib/net')
+const { memberCertRecord, profileRecord, postRecord } = require('@varanda/core/lib/records')
+const { buildFeed } = require('@varanda/core/lib/feed')
 const {
   openStore,
   openDiary,
@@ -24,7 +24,7 @@ const {
   appendRecord,
   writeConfig,
   writeFollows
-} = require('../lib/store')
+} = require('@varanda/core/lib/store')
 
 function hex (buf) {
   return b4a.toString(buf, 'hex')

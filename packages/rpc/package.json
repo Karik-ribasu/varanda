@@ -1,0 +1,15 @@
+{
+  "name": "@varanda/rpc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contrato JSON entre a interface e o nó Varanda (IPC e WebSocket)",
+  "license": "MIT",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node ../../scripts/run-tests.js"
+  }
+}

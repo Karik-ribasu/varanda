@@ -12,10 +12,11 @@
   },
   "scripts": {
     "lint": "standard",
-    "test": "node scripts/run-tests.js",
+    "test": "node ../../scripts/run-tests.js",
     "demo": "node scripts/demo.js"
   },
   "dependencies": {
+    "@varanda/core": "0.1.0",
     "b4a": "1.9.0",
     "compact-encoding": "3.5.2",
     "corestore": "7.15.0",
