@@ -1,5 +1,6 @@
 const path = require('node:path')
 const { UsageError } = require('@varanda/core/lib/errors')
+const { validBootstrap } = require('@varanda/core/lib/config')
 
 const HELP = `varanda — protótipo de rede social P2P (fase 0)
 Uso: node bin/varanda.js <comando> [subcomando] [opções]
@@ -48,15 +49,6 @@ function integer (value, name) {
     throw new UsageError(name + ' inválido')
   }
   return number
-}
-
-// Hostname or IPv4, exactly one colon, port 1..65535 with no leading zeros.
-function validBootstrap (entry) {
-  const match = /^([A-Za-z0-9.-]+):([0-9]+)$/.exec(entry)
-  if (!match) return false
-  const portText = match[2]
-  const port = Number(portText)
-  return String(port) === portText && Number.isSafeInteger(port) && port >= 1 && port <= 65535
 }
 
 function bootstrapList (rawValues) {

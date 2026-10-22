@@ -5,8 +5,8 @@ const { WIRE_CODES, MAX_ERROR_MESSAGE } = require('./errors')
 const { charLength } = require('./text')
 const { isMethod, validateParams, isPlainObject, hasOwn, isId } = require('./methods')
 
-const EVENTS = Object.freeze(['sync.event', 'sync.stopped', 'warning'])
-const STOP_REASONS = Object.freeze(['done', 'stopped', 'timeout', 'error'])
+const EVENTS = Object.freeze(['sync.started', 'sync.event', 'sync.stopped', 'warning'])
+const STOP_REASONS = Object.freeze(['done', 'stopped', 'preempted', 'timeout', 'error'])
 
 function fail (message) {
   return { ok: false, code: 'USAGE', message }
@@ -70,6 +70,7 @@ function validateEventData (event, data) {
   if (!isPlainObject(data)) return false
   if (event === 'warning') return exactKeys(data, ['line']) && isLine(data.line)
   if (event === 'sync.event') return exactKeys(data, ['runId', 'line']) && isId(data.runId) && isLine(data.line)
+  if (event === 'sync.started') return exactKeys(data, ['runId', 'once']) && isId(data.runId) && typeof data.once === 'boolean'
   // sync.stopped
   if (!exactKeys(data, ['runId', 'reason'], ['result'])) return false
   if (!isId(data.runId) || !STOP_REASONS.includes(data.reason)) return false

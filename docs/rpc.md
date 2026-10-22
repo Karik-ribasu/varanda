@@ -170,13 +170,14 @@ Results keep the field names of the CLI `--json` output (protocol §7, `apps/cli
 ### 5.14 `sync.start`
 
 - Params: `{ once?: boolean, timeoutMs?: integer 1000..600000 }`; `once` defaults to `false`; `timeoutMs` is allowed only with `once: true` (else `USAGE` `'timeoutMs só com once'`) and then defaults to 30000.
-- Result: `{ runId: integer }`, returned as soon as the run has started (it does not wait for the run). `runId` is a safe integer in `1..MAX_ID`, new for every run of the node.
+- Result: `{ runId: integer }`, returned as soon as the run has started (it does not wait for the run). `runId` is a safe integer in `1..MAX_ID`, new for every run of the node. A `sync.started` event (section 6) is emitted for the run before this response.
+- No identity yet -> `NOT_FOUND` `'identidade não encontrada'` (no run is started, no event).
 - A second `sync.start` while a run is active -> `USAGE` `'sincronização já em andamento'`. The bootstrap, DHT host and association are node configuration.
 
 ### 5.15 `sync.stop`
 
 - Params: `{}`.
-- Result: `{ stopped: boolean }`: `true` when a run was active and was asked to stop (its `sync.stopped` event follows with reason `'stopped'`), `false` when no run was active.
+- Result: `{ stopped: boolean }`: `true` when a run was active and was asked to stop (its `sync.stopped` event, reason `'stopped'`, is sent before this response: the node awaits the run), `false` when no run was active. A stopped continuous run is not restarted.
 
 ### 5.16 `sync.status`
 
@@ -185,7 +186,7 @@ Results keep the field names of the CLI `--json` output (protocol §7, `apps/cli
 
 ### Errors common to every method
 
-- The data dir held by another process, or the node session in its error state -> `LOCKED` (message `'diretório de dados em uso'` for the lock).
+- The data dir held by another process, or the node session in its error state -> `LOCKED` (message `'diretório de dados em uso'` for the lock). A request reaching a closed node session -> `LOCKED` `'sessão encerrada'`.
 - A method that needs an identity before one exists -> `NOT_FOUND` `'identidade não encontrada'`.
 - Anything else unexpected -> `INTERNAL` `'erro interno'`.
 
@@ -193,15 +194,22 @@ Results keep the field names of the CLI `--json` output (protocol §7, `apps/cli
 
 | Event | `data` (exact keys) |
 | --- | --- |
+| `sync.started` | `{ runId, once: boolean }` |
 | `sync.event` | `{ runId, line: string <= MAX_LINE chars }` |
-| `sync.stopped` | `{ runId, reason: 'done' \| 'stopped' \| 'timeout' \| 'error', result?: SyncResult }` |
+| `sync.stopped` | `{ runId, reason: 'done' \| 'stopped' \| 'preempted' \| 'timeout' \| 'error', result?: SyncResult }` |
 | `warning` | `{ line: string <= MAX_LINE chars }` |
 
+- `sync.started`: emitted every time a run starts, whether from `sync.start` or from the node restarting a continuous run after a preemption (section 6.1); `once` is the run's mode. With `sync.stopped` it lets the UI track the sync state from events alone: a run is active between its `sync.started` and its `sync.stopped`.
+
 - `sync.event` `line` = the human stdout line the CLI prints for that `runSync` event (protocol §7 `sync`: `sync ready`, `peer member <peerKey8>`, `peer seeder <peerKey8>` / `... não verificado`, `admitted <key> <length>`, `rejected <key> <reason>`, `withdrawn <key> <peerKey8> <reason>`, `have <key> <length>`, `downloaded <key> <length>`), built with `safe()` exactly as `apps/cli/lib/commands/sync.js` `formatEvent` does. An event with no stdout line is not sent.
-- `warning` `line` = a line the CLI prints on stderr, escaped with `safe()`: the `runSync` `log` lines (`aviso: ...`), `aviso: diário <key8> ignorado (<reason>)` for a `skipped` event, and, before a `sync.stopped` with reason `'error'`, `'erro: ' + message` (a message that passes the section 7 safety rule, else `'erro: erro interno'`).
-- `sync.stopped`: emitted once per run when it ends. Reasons: `'stopped'` = ended by `sync.stop` or by the connection closing; `'timeout'` = a `once` run ended at its deadline (`result.ok === false` with `errors[0]` = `'sem pares'` or starting with `'tempo esgotado'`); `'done'` = any other resolved run; `'error'` = `runSync` threw (no `result`). `result` is present only for a resolved `once` run, and is the SyncResult passed through `capSyncResult` (below).
+- `warning` `line` = a line the CLI prints on stderr, escaped with `safe()`: the `runSync` `log` lines (`aviso: ...`; a line that contains `/`, `\` or a run of 16+ hex digits, i.e. a raw error message that may carry a path or key material, keeps its prefix up to the first `': '` after `aviso: ` and ends with `': erro interno'`, and the full line goes only to the host's `onInternalError`), `aviso: diário <key8> ignorado (<reason>)` for a `skipped` event, and, before a `sync.stopped` with reason `'error'`, `'erro: ' + message` (a message that passes the section 7 safety rule, else `'erro: erro interno'`).
+- `sync.stopped`: emitted once per run when it ends. Reasons: `'stopped'` = ended by `sync.stop`, by the connection closing or by the node session closing; `'preempted'` = the node paused the run to serve a request (or because the app went to the background, section 6.1); `'timeout'` = a `once` run ended at its deadline (`result.ok === false` with `errors[0]` = `'sem pares'` or starting with `'tempo esgotado'`); `'done'` = any other resolved run; `'error'` = `runSync` threw (no `result`). `result` is present only for a resolved `once` run (whatever the reason, `'stopped'` and `'preempted'` included), and is the SyncResult passed through `capSyncResult` (below).
 - Lines and reasons are human text the node already escaped with `safe()` (A8). The UI still renders every line as text only (never markup) and through `displayText` (section 10).
 - A run's events may reach the client before the `sync.start` response; the UI keys them by `runId`.
+
+### 6.1 Preemption (the node session, `packages/core/lib/session.js`)
+
+Every member operation opens the store and takes the data-dir lock, and a running sync holds that lock (protocol §9). The node therefore serves requests strictly one at a time, and before any request that opens the store (every member method, and `node.info` / `sync.start` while the own identity is not yet known to the session) it aborts the running sync and awaits it (`sync.stopped` with reason `'preempted'`). After the request, a continuous run (`once: false`) that the user did not stop is restarted with a new `runId` (`sync.started`, sent before that response); when several requests are queued the run is preempted once and restarted after the last of them. A `node.info` that preempted the run reports the restarted run in its `sync` field. A preempted `once` run is over: it is not restarted. `sync.status`, `sync.stop` and a `node.info` served from the session's cache never preempt. While the app is in the background (the host suspends the session) the run is paused the same way and restarted on resume; requests sent meanwhile wait.
 
 ### Capped SyncResult (`capSyncResult(result)`)
 
@@ -288,7 +296,7 @@ This is the `isUnsafe` set of `packages/core/lib/safe.js` plus the three marks a
 
 ## 12. Module exports (`require('@varanda/rpc')`)
 
-`index.js` re-exports: every constant of section 2; every export of section 7; `METHODS` (array), `MUTATING` (frozen array), `isMethod`, `isMutating`, `validateParams`, `isKey`, `isRef(str, minSeq = 1)`; `EVENTS`, `STOP_REASONS`, `validateRequest`, `validateResponse`, `validateEvent`; `encodeFrame`, `createFrameDecoder`, `parseMessage`; `displayText`, `utf8ByteLength`, `utf8Encode`, `utf8Decode`, `clipText(str, max)`; `tokensEqual`; `capList`, `capSyncResult`; `createServerDispatcher`, `createClient`. Files: `lib/limits.js`, `lib/errors.js`, `lib/methods.js`, `lib/envelope.js`, `lib/framing.js`, `lib/text.js`, `lib/token.js`, `lib/server.js`, `lib/client.js`.
+`index.js` re-exports: every constant of section 2; every export of section 7; `METHODS` (array), `MUTATING` (frozen array), `isMethod`, `isMutating`, `validateParams`, `isKey`, `isRef(str, minSeq = 1)`; `EVENTS` (`['sync.started', 'sync.event', 'sync.stopped', 'warning']`), `STOP_REASONS` (`['done', 'stopped', 'preempted', 'timeout', 'error']`), `validateRequest`, `validateResponse`, `validateEvent`; `encodeFrame`, `createFrameDecoder`, `parseMessage`; `displayText`, `utf8ByteLength`, `utf8Encode`, `utf8Decode`, `clipText(str, max)`; `tokensEqual`; `capList`, `capSyncResult`; `createServerDispatcher`, `createClient`. Files: `lib/limits.js`, `lib/errors.js`, `lib/methods.js`, `lib/envelope.js`, `lib/framing.js`, `lib/text.js`, `lib/token.js`, `lib/server.js`, `lib/client.js`.
 
 ## 13. Known limits (v1)
 

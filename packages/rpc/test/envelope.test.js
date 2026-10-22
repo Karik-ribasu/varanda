@@ -1,7 +1,7 @@
 'use strict'
 
 const test = require('brittle')
-const { validateRequest, validateResponse, validateEvent, MAX_ID } = require('..')
+const { validateRequest, validateResponse, validateEvent, EVENTS, STOP_REASONS, MAX_ID } = require('..')
 
 const req = (over = {}) => ({ v: 1, id: 1, method: 'node.info', params: {}, ...over })
 
@@ -65,12 +65,26 @@ test('response: success and error', (t) => {
   t.absent(validateResponse({ v: 1, id: 1, ok: true, result: {}, x: 1 }).ok)
 })
 
+test('event names and stop reasons (sync.started and preempted included)', (t) => {
+  t.alike([...EVENTS], ['sync.started', 'sync.event', 'sync.stopped', 'warning'])
+  t.alike([...STOP_REASONS], ['done', 'stopped', 'preempted', 'timeout', 'error'])
+  t.ok(Object.isFrozen(EVENTS))
+  t.ok(Object.isFrozen(STOP_REASONS))
+})
+
 test('event: shapes', (t) => {
   t.ok(validateEvent({ v: 1, event: 'warning', seq: 1, data: { line: 'aviso' } }).ok)
   t.ok(validateEvent({ v: 1, event: 'sync.event', seq: 2, data: { runId: 1, line: 'sync ready' } }).ok)
   t.ok(validateEvent({ v: 1, event: 'sync.stopped', seq: 3, data: { runId: 1, reason: 'done', result: { ok: true } } }).ok)
   t.ok(validateEvent({ v: 1, event: 'sync.stopped', seq: 3, data: { runId: 1, reason: 'stopped' } }).ok)
+  t.ok(validateEvent({ v: 1, event: 'sync.stopped', seq: 3, data: { runId: 1, reason: 'preempted' } }).ok)
   t.absent(validateEvent({ v: 1, event: 'sync.stopped', seq: 3, data: { runId: 1, reason: 'other' } }).ok)
+  t.ok(validateEvent({ v: 1, event: 'sync.started', seq: 4, data: { runId: 2, once: false } }).ok)
+  t.ok(validateEvent({ v: 1, event: 'sync.started', seq: 4, data: { runId: 2, once: true } }).ok)
+  t.absent(validateEvent({ v: 1, event: 'sync.started', seq: 4, data: { runId: 2 } }).ok)
+  t.absent(validateEvent({ v: 1, event: 'sync.started', seq: 4, data: { runId: 2, once: 'false' } }).ok)
+  t.absent(validateEvent({ v: 1, event: 'sync.started', seq: 4, data: { runId: 0, once: false } }).ok)
+  t.absent(validateEvent({ v: 1, event: 'sync.started', seq: 4, data: { runId: 2, once: false, line: 'x' } }).ok)
   t.absent(validateEvent({ v: 1, event: 'sync.stopped', seq: 3, data: { runId: 1, reason: 'done', result: [] } }).ok)
   t.absent(validateEvent({ v: 1, event: 'warning', seq: 0, data: { line: 'x' } }).ok)
   t.absent(validateEvent({ v: 1, event: 'warning', seq: 1, data: { line: 'x', extra: 1 } }).ok)

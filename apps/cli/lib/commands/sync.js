@@ -1,35 +1,8 @@
 const { runSync } = require('@varanda/core/lib/sync')
 const { safe, jsonLine } = require('@varanda/core/lib/safe')
+const { key8, formatEvent } = require('@varanda/core/lib/sync-format')
 
 const LF = '\n'
-
-function key8 (hex) {
-  return safe(String(hex).slice(0, 8))
-}
-
-// Human stdout line for a sync event (docs §7); null = nothing on stdout.
-function formatEvent (ev) {
-  switch (ev.event) {
-    case 'ready':
-      return 'sync ready'
-    case 'peer': {
-      const unverified = ev.role === 'seeder' && !ev.verified ? ' não verificado' : ''
-      return 'peer ' + safe(ev.role) + ' ' + key8(ev.peerKey) + unverified
-    }
-    case 'admitted':
-      return 'admitted ' + safe(ev.key) + ' ' + safe(ev.length)
-    case 'rejected':
-      return 'rejected ' + safe(ev.key) + ' ' + safe(ev.reason)
-    case 'withdrawn':
-      return 'withdrawn ' + safe(ev.key) + ' ' + key8(ev.peerKey) + ' ' + safe(ev.reason)
-    case 'have':
-      return 'have ' + safe(ev.key) + ' ' + safe(ev.length)
-    case 'downloaded':
-      return 'downloaded ' + safe(ev.key) + ' ' + safe(ev.length)
-    default:
-      return null
-  }
-}
 
 const commands = {
   sync: {
