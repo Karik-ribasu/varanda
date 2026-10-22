@@ -1,0 +1,158 @@
+'use strict'
+
+const fs = require('node:fs')
+const { formatFeedItem } = require('@varanda/core/lib/feed')
+const { jsonLine } = require('@varanda/core/lib/safe')
+const member = require('@varanda/core/lib/member')
+
+function usage (message) {
+  const err = new Error(message)
+  err.code = 'USAGE'
+  return err
+}
+
+function print (flags, result, line) {
+  process.stdout.write((flags.json ? jsonLine(result) : line) + '\n')
+}
+
+function warn (line) {
+  process.stderr.write(line + '\n')
+}
+
+// The CLI runs with today's store options (none).
+function ctxOf (flags) {
+  return { dataDir: flags.dataDir, association: flags.association || null }
+}
+
+function subOf (flags, expected, message) {
+  const sub = flags.positionals[0]
+  if (sub !== expected && !(Array.isArray(expected) && expected.includes(sub))) throw usage(message)
+  return sub
+}
+
+// ---- id ----
+
+async function idRun (flags) {
+  const sub = flags.positionals[0]
+  if (sub === 'create') {
+    const result = await member.idCreate(ctxOf(flags))
+    print(flags, result, 'chave pública: ' + result.publicKey)
+  } else if (sub === 'show') {
+    const result = await member.idShow(ctxOf(flags))
+    print(flags, result, 'chave pública: ' + result.publicKey)
+  } else {
+    throw usage('node bin/varanda.js id create|show')
+  }
+}
+
+// ---- cert ----
+
+function readCertFile (file) {
+  let text
+  try {
+    text = fs.readFileSync(file, 'utf8')
+  } catch {
+    throw new Error('não foi possível ler ' + file)
+  }
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error('certificado inválido (malformed)')
+  }
+}
+
+async function certRun (flags) {
+  subOf(flags, 'add', 'node bin/varanda.js cert add')
+  if (!flags.certFile) throw usage('informe --cert-file <arquivo>')
+  const ctx = ctxOf(flags)
+  // A missing identity is reported before an unreadable file.
+  member.trustRoot(ctx)
+  const cert = readCertFile(flags.certFile)
+  const result = await member.certAdd(ctx, cert)
+  print(flags, result, 'certificado gravado (bloco 0)')
+}
+
+// ---- profile / post / reply ----
+
+async function profileRun (flags) {
+  subOf(flags, 'set', 'node bin/varanda.js profile set')
+  if (flags.name === null) throw usage('informe --name <nome>')
+  const result = await member.profileSet(ctxOf(flags), { name: flags.name, bio: flags.bio })
+  print(flags, result, 'perfil atualizado #' + result.seq)
+}
+
+async function postRun (flags) {
+  if (flags.text === null) throw usage('informe --text <texto>')
+  const result = await member.postCreate(ctxOf(flags), { text: flags.text })
+  print(flags, result, 'publicado #' + result.seq)
+}
+
+async function replyRun (flags) {
+  if (!flags.to || flags.text === null) throw usage('informe --to <chave>:<seq> e --text <texto>')
+  const result = await member.postReply(ctxOf(flags), { to: flags.to, text: flags.text })
+  print(flags, result, 'publicado #' + result.seq)
+}
+
+// ---- follows ----
+
+async function followRun (flags, follow) {
+  if (!flags.author) throw usage('informe --author <hex>')
+  const ctx = ctxOf(flags)
+  const result = follow ? await member.followAdd(ctx, flags.author) : await member.followRemove(ctx, flags.author)
+  let line
+  if (follow) line = result.changed ? 'seguindo ' + flags.author : 'já seguindo'
+  else line = result.changed ? 'deixou de seguir ' + flags.author : 'não seguia'
+  print(flags, result, line)
+}
+
+async function followsRun (flags) {
+  const result = await member.followList(ctxOf(flags))
+  print(flags, result, result.follows.join('\n'))
+}
+
+// ---- log ----
+
+async function logRun (flags) {
+  const { key, entries } = await member.logRead(ctxOf(flags), { author: flags.author || null })
+  for (const entry of entries) process.stdout.write(jsonLine({ seq: entry.seq, record: entry.record }) + '\n')
+  if (flags.json) process.stdout.write(jsonLine({ key, entries }) + '\n')
+}
+
+// ---- feed ----
+
+async function feedRun (flags) {
+  const { items, skipped, future } = await member.feedRead(ctxOf(flags), {
+    limit: flags.limit || Infinity,
+    onWarn: warn
+  })
+  if (flags.json) {
+    process.stdout.write(jsonLine({ items, skipped, future }) + '\n')
+  } else {
+    const width = feedWidth(process.stdout)
+    for (const item of items) process.stdout.write(formatFeedItem(item, { width }) + '\n')
+  }
+}
+
+// Wrap width of the human feed: the terminal width on a TTY, otherwise 80
+// (scripts should use --json, which is never wrapped). Floor of 20.
+function feedWidth (stream) {
+  const cols = stream.isTTY ? Number(stream.columns) : 80
+  return Math.max(20, Number.isFinite(cols) && cols > 0 ? cols : 80)
+}
+
+module.exports = {
+  publishConfig: member.publishConfig,
+  feedWidth,
+  commands: {
+    id: { summary: 'identidade (chave pública do diário)', run: idRun },
+    cert: { summary: 'grava o certificado como bloco 0 do diário', run: certRun },
+    profile: { summary: 'define nome e bio', run: profileRun },
+    post: { summary: 'publica um texto (--text)', run: postRun },
+    reply: { summary: 'responde a uma publicação (--to <chave>:<seq> --text)', run: replyRun },
+    follow: { summary: 'segue uma chave pública', run: (flags) => followRun(flags, true) },
+    unfollow: { summary: 'deixa de seguir uma chave pública', run: (flags) => followRun(flags, false) },
+    follows: { summary: 'lista as chaves seguidas', run: followsRun },
+    log: { summary: 'mostra os blocos locais de um diário', run: logRun },
+    feed: { summary: 'feed com as publicações dos diários seguidos', run: feedRun }
+  }
+}

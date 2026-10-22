@@ -1,0 +1,41 @@
+{
+  "name": "varanda",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Protótipo fase 0 de rede social P2P (perfis, publicações, semeador)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "varanda": "bin/varanda.js",
+    "varanda-serve": "bin/varanda-serve.js"
+  },
+  "scripts": {
+    "lint": "standard",
+    "test": "node ../../scripts/run-tests.js",
+    "demo": "node scripts/demo.js"
+  },
+  "dependencies": {
+    "@varanda/core": "0.1.0",
+    "@varanda/rpc": "0.1.0",
+    "b4a": "1.9.0",
+    "compact-encoding": "3.5.2",
+    "corestore": "7.15.0",
+    "hypercore": "11.39.0",
+    "hypercore-crypto": "3.7.0",
+    "hyperdht": "6.34.1",
+    "hyperswarm": "4.17.2",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "brittle": "4.5.0",
+    "standard": "17.1.2"
+  },
+  "standard": {
+    "ignore": [
+      "data/",
+      "demo-data/"
+    ]
+  }
+}

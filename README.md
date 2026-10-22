@@ -2,6 +2,16 @@
 
 Protótipo de fase 0 de uma rede social ponto a ponto no Holepunch (Hypercore, Hyperswarm e HyperDHT). Os comandos são um programa de terminal. A referência normativa dos formatos é [docs/protocol.md](docs/protocol.md).
 
+## Estrutura do repositório
+
+É um monorepo npm (workspaces `packages/*` e `apps/*`, um só `package-lock.json` na raiz).
+
+- `apps/cli`: o programa de linha de comando (`varanda`, `varanda-serve`), o semeador e a demo. [README](apps/cli/README.md).
+- `apps/app`: aplicativo iOS, Android e web, com o worklet Bare que roda o nó no celular e a interface de membro. [README](apps/app/README.md).
+- `packages/core`: o núcleo do protocolo e a sessão do nó, usados pelo CLI e pelo app (Node e Bare). [README](packages/core/README.md).
+- `packages/rpc`: o contrato JSON entre a interface e o nó. [README](packages/rpc/README.md).
+- `docs/`: `protocol.md` (referência normativa dos formatos), `rpc.md` (contrato da interface), `design.md` (documento de design), `development.md`, `app.md` e `ios-gate.md`. O índice está em [docs/README.md](docs/README.md).
+
 ## O que é
 
 Cada pessoa tem um diário assinado no próprio dispositivo. Seguidores e semeadores guardam cópias. O semeador só guarda um diário cujo bloco 0 traz um certificado de membro válido da associação em que ele confia. A identidade é a chave pública desse diário: 64 dígitos hexadecimais (32 bytes).
@@ -15,7 +25,7 @@ O semeador também tem certificado da mesma associação. Só um semeador verifi
 - Node.js 20 ou mais novo (`engines.node` é `>=20`)
 - npm
 
-O protótipo roda no Node. Esta fase não usa o runtime Pear, não usa o runtime Bare e não tem interface gráfica. Não há etapa de compilação.
+O programa de terminal roda no Node e não tem etapa de compilação. O núcleo (`packages/core`) também roda no runtime Bare, dentro do aplicativo (`apps/app`; veja [docs/development.md](docs/development.md) para compilar o app). Esta fase não usa o runtime Pear.
 
 ## Instalação
 
@@ -86,7 +96,7 @@ O certificado tem exatamente estas chaves: `v` (1), `member` (chave pública do 
 
 Faixas sugeridas: `13-15`, `16-17`, `18+`. O padrão de `assoc certify` é `--age-band 18+` e `--method stub`. `ageBand` casa com `/^[a-z0-9+-]{1,32}$/`; `method` casa com `/^[a-z0-9-]{1,32}$/`.
 
-A associação guarda, por membro, só a chave pública, a faixa etária, o método e a data (`members.jsonl`). Não guarda assinatura, chave secreta, imagem nem documento. Quem opera `assoc certify` afirma a faixa etária. A checagem de idade de um provedor real está fora desta fase (comentário `TODO(phase1)` em `lib/assoc.js`).
+A associação guarda, por membro, só a chave pública, a faixa etária, o método e a data (`members.jsonl`). Não guarda assinatura, chave secreta, imagem nem documento. Quem opera `assoc certify` afirma a faixa etária. A checagem de idade de um provedor real está fora desta fase (comentário `TODO(phase1)` em `packages/core/lib/assoc.js`).
 
 ### Certificado de semeador
 
@@ -132,7 +142,7 @@ Um `VARANDA_BOOTSTRAP` vazio ou malformado é erro de uso e não cai na DHT púb
 
 `VARANDA_DHT_HOST` e `--dht-host` aceitam uma string não vazia e sem espaço. Qualquer outro valor termina com `uso: dht-host inválido`.
 
-A DHT local de `scripts/local-dht.js` escuta só em `127.0.0.1`. Com ela, defina `VARANDA_DHT_HOST=127.0.0.1` ou passe `--dht-host 127.0.0.1`. Testes e `npm run demo` usam esse endereço. Sem bootstrap (DHT pública, uso manual), o endereço local é opcional e a DHT fica nos padrões da biblioteca.
+A DHT local de `apps/cli/scripts/local-dht.js` escuta só em `127.0.0.1`. Com ela, defina `VARANDA_DHT_HOST=127.0.0.1` ou passe `--dht-host 127.0.0.1`. Testes e `npm run demo` usam esse endereço. Sem bootstrap (DHT pública, uso manual), o endereço local é opcional e a DHT fica nos padrões da biblioteca.
 
 ### Um processo por diretório de dados
 
@@ -144,7 +154,7 @@ Não misture papéis no mesmo diretório. Comando de membro em diretório de sem
 
 ### Publicação no futuro e diário reescrito
 
-Uma publicação válida cuja data `at` está mais de 24 horas à frente do relógio de quem lê (`MAX_FUTURE_MS` = 86400000 em `lib/feed.js`) fica de fora do feed. O comando avisa em stderr `aviso: publicação <chave>:<seq> ignorada (future)`. Ela volta sozinha quando o relógio do leitor chega em `at` menos 24 horas. Publicação no passado permanece e afunda na ordem `(at, autor, seq)`. O corte é pular, não redatar: redatar mudaria a posição em cada leitor e em cada execução.
+Uma publicação válida cuja data `at` está mais de 24 horas à frente do relógio de quem lê (`MAX_FUTURE_MS` = 86400000 em `packages/core/lib/feed.js`) fica de fora do feed. O comando avisa em stderr `aviso: publicação <chave>:<seq> ignorada (future)`. Ela volta sozinha quando o relógio do leitor chega em `at` menos 24 horas. Publicação no passado permanece e afunda na ordem `(at, autor, seq)`. O corte é pular, não redatar: redatar mudaria a posição em cada leitor e em cada execução.
 
 Nenhum escritor desta fase trunca o diário. Se `fork` deixa de ser zero, o detentor da chave reescreveu o histórico. Esse diário é descartado em todo lugar, motivo `fork`: o semeador para de servi-lo, o `sync` apaga a réplica e o `feed` avisa `aviso: diário <8 hex> ignorado (fork)`. O `feed` só lê; o próximo `sync` é que apaga a cópia local.
 
@@ -167,10 +177,10 @@ Cada comando deve terminar com código 0 antes do próximo. A chave secreta da a
 **DHT local** (um computador, sem a DHT pública). Num terminal, deixe rodando:
 
 ```sh
-node scripts/local-dht.js
+node apps/cli/scripts/local-dht.js
 ```
 
-A porta padrão é 49737 (`node scripts/local-dht.js --port 49800` escolhe outra). O processo escuta só em `127.0.0.1` e imprime uma linha `export VARANDA_BOOTSTRAP=127.0.0.1:<porta>`. Ctrl-C encerra.
+A porta padrão é 49737 (`node apps/cli/scripts/local-dht.js --port 49800` escolhe outra). O processo escuta só em `127.0.0.1` e imprime uma linha `export VARANDA_BOOTSTRAP=127.0.0.1:<porta>`. Ctrl-C encerra.
 
 Nos outros terminais, use a linha impressa e o endereço local. Com a porta padrão:
 
@@ -179,7 +189,7 @@ export VARANDA_BOOTSTRAP=127.0.0.1:49737
 export VARANDA_DHT_HOST=127.0.0.1
 ```
 
-**DHT pública.** Não inicie `scripts/local-dht.js` e deixe `VARANDA_BOOTSTRAP` e `VARANDA_DHT_HOST` sem definir (`unset VARANDA_BOOTSTRAP VARANDA_DHT_HOST`: um `VARANDA_DHT_HOST=127.0.0.1` que sobrou da DHT local prenderia a DHT ao loopback, longe dos pares públicos). Os comandos usam a DHT pública. Não passe `--bootstrap` nem `--dht-host`. Nas linhas de `seed` e `sync` abaixo, apague `--bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"`.
+**DHT pública.** Não inicie `apps/cli/scripts/local-dht.js` e deixe `VARANDA_BOOTSTRAP` e `VARANDA_DHT_HOST` sem definir (`unset VARANDA_BOOTSTRAP VARANDA_DHT_HOST`: um `VARANDA_DHT_HOST=127.0.0.1` que sobrou da DHT local prenderia a DHT ao loopback, longe dos pares públicos). Os comandos usam a DHT pública. Não passe `--bootstrap` nem `--dht-host`. Nas linhas de `seed` e `sync` abaixo, apague `--bootstrap "$VARANDA_BOOTSTRAP" --dht-host "$VARANDA_DHT_HOST"`.
 
 ### 2. Associação
 
@@ -291,7 +301,7 @@ Para encerrar: Ctrl-C no semeador (código 0) e Ctrl-C na DHT local.
 npm run demo
 ```
 
-O mesmo programa é `node scripts/demo.js`. Ele sobe uma DHT em processo, em `127.0.0.1` (três nós), define `VARANDA_BOOTSTRAP` e `VARANDA_DHT_HOST=127.0.0.1`, e não fala com a DHT pública. Os dados ficam num diretório temporário, apagado no fim (salvo com `--keep`).
+O mesmo programa é `node apps/cli/scripts/demo.js`. Ele sobe uma DHT em processo, em `127.0.0.1` (três nós), define `VARANDA_BOOTSTRAP` e `VARANDA_DHT_HOST=127.0.0.1`, e não fala com a DHT pública. Os dados ficam num diretório temporário, apagado no fim (salvo com `--keep`).
 
 O que a demo mostra, nesta ordem:
 
@@ -316,32 +326,73 @@ No sucesso o processo sai com código 0 e imprime `DEMO OK`. Na primeira falha i
 npm run demo -- --keep
 ```
 
+## Servidor local para a interface web (varanda-serve)
+
+`node bin/varanda-serve.js` roda um nó Varanda (a sessão do núcleo) neste computador e o expõe a uma interface no navegador por um WebSocket local. As chaves ficam nesta máquina. É um programa separado: `node bin/varanda.js` não muda.
+
+```sh
+node bin/varanda-serve.js --data ./data --association <hex> \
+  --bootstrap 127.0.0.1:49737 --dht-host 127.0.0.1 --ui apps/app/dist
+```
+
+Imprime uma vez, depois de começar a escutar:
+
+```
+varanda-serve em http://127.0.0.1:<porta>
+abra http://127.0.0.1:<porta>/#token=<token>
+```
+
+Sem `--ui`, a segunda linha é `token: <token>`. O token só aparece nessa linha. Na URL ele vai depois do `#`, que o navegador não envia ao servidor.
+
+Opções (`--help` imprime a lista):
+
+- `--port <n>`: porta local, padrão 8787. `0` escolhe uma porta livre.
+- `--origin <url>`: origem permitida no WebSocket, repetível, escrita exatamente como o navegador a envia (`http://localhost:8081`, sem barra no fim).
+- `--ui <dir>`: diretório com a exportação web estática. Com ele, `http://127.0.0.1:<porta>` e `http://localhost:<porta>` também são origens permitidas.
+- `--public-dht`: usa a DHT pública. Aqui ela é opt-in: sem `--bootstrap` (ou `VARANDA_BOOTSTRAP`) e sem `--public-dht` o servidor recusa com `uso: informe --bootstrap ou --public-dht`. As duas juntas também são erro de uso.
+- `--data`, `--association`, `--bootstrap`, `--dht-host` e as variáveis `VARANDA_*` funcionam como no `varanda`. Sem `--association`, vale a associação do `config.json` de membro já existente.
+
+O token são 32 bytes aleatórios (64 dígitos hexadecimais), gerados a cada início. Não existe opção `--token` (a linha de comando é visível a todo usuário local em `ps`) nem token fixo: `VARANDA_SERVE_TOKEN` é recusado (`uso: VARANDA_SERVE_TOKEN não é aceito: o token é gerado a cada início`). O endereço impresso é uma credencial enquanto o processo roda: a página tira o token da barra de endereço, mas o navegador pode guardar a visita no histórico. Prefira abrir o endereço numa janela anônima e encerre o `varanda-serve` quando terminar; ao reiniciar, abra o endereço novo.
+
+Recusas antes de escutar (código 2, `uso: <mensagem>`): diretório de semeador ou de associação (`uso: diretório não é de um membro`), chave ou bootstrap inválidos, nenhuma origem permitida (`uso: informe --origin ou --ui`), opção desconhecida. Porta ocupada: `erro: porta em uso`, código 1.
+
+Regras de segurança:
+
+- Escuta só em `127.0.0.1`. Não há opção de host.
+- Toda requisição HTTP e todo upgrade exigem `Host` igual a `127.0.0.1:<porta>` ou `localhost:<porta>` (defesa contra DNS rebinding), senão 421. Nunca há cabeçalhos CORS.
+- HTTP aceita só GET e HEAD (senão 405). Sem `--ui`, tudo fora de `/rpc` é 404. Com `--ui`, só arquivos dentro do diretório (pelo caminho real): `..`, barra invertida, NUL, arquivos com ponto no início e links simbólicos para fora dão 404; um caminho sem extensão que não é arquivo devolve `index.html`. Não há listagem de diretório. Toda resposta leva `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY` e `Cache-Control: no-store`.
+- O WebSocket fica em `/rpc` e exige `Origin` permitido (senão 403). No máximo 4 conexões abertas (a quinta recebe 503). Mensagens só de texto (binário fecha com 1003), até `MAX_REQUEST` bytes, no máximo 20 por segundo com rajada de 40 (acima disso fecha com 1008). `session.open` com o token tem de chegar em 5 s. Só uma conexão autenticada por vez: a nova fecha a anterior com o código 4000 (`substituída`). Um cliente que não lê e acumula mais de `MAX_OUTBOUND` bytes é desligado.
+- `VARANDA_SERVE_OPEN_TIMEOUT_MS` existe só para os testes: encurta o prazo do `session.open` (1 a 5000 ms), nunca o alonga.
+
+Ctrl-C (SIGINT) ou SIGTERM fecha as conexões (código 1001), espera a sessão terminar, libera o diretório de dados e sai com 0. Erros internos aparecem só em stderr como `erro interno: <mensagem>`, nunca para o cliente.
+
 ## Testes e lint
 
 ```sh
 npm test
 npm run lint
-node test/smoke.test.js
+node apps/cli/test/smoke.test.js
 ```
 
-`npm test` roda `node scripts/run-tests.js`, que executa cada `test/*.test.js` em sequência. Um arquivo sozinho:
+`npm test` roda, dentro de `apps/cli`, `node ../../scripts/run-tests.js`, que executa cada `test/*.test.js` desse diretório em sequência. Um arquivo sozinho, a partir da raiz:
 
 ```sh
-node test/assoc.test.js
-node test/cert.test.js
-node test/cli.test.js
-node test/commands.test.js
-node test/e2e.test.js
-node test/feed.test.js
-node test/net.test.js
-node test/records.test.js
-node test/seeder.test.js
-node test/smoke.test.js
-node test/store.test.js
-node test/sync.test.js
+node apps/cli/test/assoc.test.js
+node apps/cli/test/cert.test.js
+node apps/cli/test/cli.test.js
+node apps/cli/test/commands.test.js
+node apps/cli/test/e2e.test.js
+node apps/cli/test/feed.test.js
+node apps/cli/test/net.test.js
+node apps/cli/test/records.test.js
+node apps/cli/test/seeder.test.js
+node apps/cli/test/serve.test.js
+node apps/cli/test/smoke.test.js
+node apps/cli/test/store.test.js
+node apps/cli/test/sync.test.js
 ```
 
-Os testes de rede usam uma DHT local em processo (`hyperdht/testnet` por `test/helpers/net.js`), presa a `127.0.0.1`. Nenhum teste usa a DHT pública. `npm run lint` roda o `standard`.
+Os testes de rede usam uma DHT local em processo (`hyperdht/testnet` por `apps/cli/test/helpers/net.js`), presa a `127.0.0.1`. Nenhum teste usa a DHT pública. `npm run lint` roda o `standard`.
 
 ## Layout de armazenamento
 
@@ -457,13 +508,13 @@ Limites desta fase:
 
 Fora desta fase:
 
-- Verificação de idade real. Hoje o operador de `assoc certify` afirma `--age-band`. Comentário `TODO(phase1): the real age-check vendor decides here; today the operator asserts the age band.` em `lib/assoc.js`. O mesmo limite está em `docs/protocol.md` (certificados).
-- Notificações push quando um diário seguido cresce. Comentário `TODO(phase1): push notifications when a followed log grows.` em `lib/sync.js` e em `docs/protocol.md` (sync).
+- Verificação de idade real. Hoje o operador de `assoc certify` afirma `--age-band`. Comentário `TODO(phase1): the real age-check vendor decides here; today the operator asserts the age band.` em `packages/core/lib/assoc.js`. O mesmo limite está em `docs/protocol.md` (certificados).
+- Notificações push quando um diário seguido cresce. Comentário `TODO(phase1): push notifications when a followed log grows.` em `packages/core/lib/sync.js` e em `docs/protocol.md` (sync).
 - Recuperação da chave do diário com chaves limiar FROST. Comentário `TODO(phase2): threshold-key (FROST) recovery of this key.` em `docs/protocol.md` (identidade). A chave fica no `store/` deste dispositivo.
-- Listas de moderação e revogação. Certificado de membro e certificado de semeador não expiram e não são revogados nesta fase. Comentários `TODO(phase2): moderation lists — consult a block list before admitting.` e `TODO(phase2): certificate revocation list.` em `lib/seeder.js`. Também `TODO(later): media attachments and moderation lists are out of scope for phase 0.` em `lib/records.js`, e os `TODO(phase2)` / `TODO(later phases)` correspondentes em `docs/protocol.md` (registros, certificados e admissão).
-- Mídia. Publicação é só texto, até 1000 caracteres. O comentário de `lib/records.js` citado acima, e `docs/protocol.md` (registros), deixam anexos para uma fase posterior.
+- Listas de moderação e revogação. Certificado de membro e certificado de semeador não expiram e não são revogados nesta fase. Comentários `TODO(phase2): moderation lists — consult a block list before admitting.` e `TODO(phase2): certificate revocation list.` em `packages/core/lib/seeder.js`. Também `TODO(later): media attachments and moderation lists are out of scope for phase 0.` em `packages/core/lib/records.js`, e os `TODO(phase2)` / `TODO(later phases)` correspondentes em `docs/protocol.md` (registros, certificados e admissão).
+- Mídia. Publicação é só texto, até 1000 caracteres. O comentário de `packages/core/lib/records.js` citado acima, e `docs/protocol.md` (registros), deixam anexos para uma fase posterior.
 - Empacotamento Pear ou Bare, e interface gráfica. O protótipo é um programa Node. Não há comentário `TODO` no código para esse empacotamento.
-- Relay de certificados por seguidores. O `sync` anuncia só o próprio diário (`lib/sync.js` envia `announce` da chave local e ignora `announce` recebido). Um seguidor não apresenta ao semeador o certificado de outra pessoa. Se a autora nunca sincronizou, o semeador não tem a cópia, mesmo que um seguidor já a tenha. Não há comentário `TODO` no código para esse relay. `docs/protocol.md` registra que o `announce` permanece sem autenticação de propósito: qualquer par pode pedir a admissão, e só entra o diário cujo bloco 0 passa na verificação.
+- Relay de certificados por seguidores. O `sync` anuncia só o próprio diário (`packages/core/lib/sync.js` envia `announce` da chave local e ignora `announce` recebido). Um seguidor não apresenta ao semeador o certificado de outra pessoa. Se a autora nunca sincronizou, o semeador não tem a cópia, mesmo que um seguidor já a tenha. Não há comentário `TODO` no código para esse relay. `docs/protocol.md` registra que o `announce` permanece sem autenticação de propósito: qualquer par pode pedir a admissão, e só entra o diário cujo bloco 0 passa na verificação.
 
 ## Códigos de saída
 
