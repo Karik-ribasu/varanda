@@ -190,7 +190,8 @@ h1 {
   position: relative;
   display: flex;
   justify-content: center;
-  padding: 8px 0 44px;
+  /* on phones the chair gets its own column, so it never covers the screen */
+  padding: 8px 0 44px min(112px, 30%);
 }
 .heroi__cena::before {
   content: "";
@@ -231,9 +232,9 @@ h1 {
   position: absolute;
   /* the chair's feet sit 8% above the bottom of its box: lower it so they stand on the sand */
   bottom: -10px;
-  left: max(6px, calc(50% - 205px));
-  width: 128px;
-  height: 128px;
+  left: 0;
+  width: calc(min(112px, 30%) - 8px);
+  height: auto;
   z-index: 2;
   /* a warm rim of sunset light keeps the ink frame readable on the dusk colours */
   filter: drop-shadow(0 0 1.5px rgba(255, 244, 224, 0.85)) drop-shadow(0 0 10px rgba(255, 196, 140, 0.35));
@@ -692,7 +693,7 @@ h2::after {
   height: calc(83 * var(--pt));
   padding: calc(7 * var(--pt)) calc(8 * var(--pt)) calc(26 * var(--pt));
   border-top: calc(1 * var(--pt)) solid var(--app-fio);
-  background: rgba(251, 248, 243, 0.94);
+  background: var(--creme);
 }
 .aba {
   flex: 1;
@@ -895,7 +896,8 @@ h2::after {
 @media (min-width: 620px) {
   .telas { grid-template-columns: repeat(2, 1fr); }
   .nomes { grid-template-columns: repeat(2, 1fr); }
-  .heroi__cadeira { width: 152px; height: 152px; left: calc(50% - 250px); bottom: -12px; }
+  .heroi__cena { padding-left: 0; }
+  .heroi__cadeira { width: 152px; height: 152px; left: max(0px, calc(50% - 290px)); bottom: -12px; }
 }
 
 /* Telas largas */
