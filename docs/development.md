@@ -130,3 +130,11 @@ npm install --save-exact --save-dev <name>@<version> -w <workspace>
 ```
 
 For example `-w packages/core`. Then run `npm run lint` and `npm test`. For a package the worklet loads, also run `npm run pack:worklet -w apps/app`, whose scan fails if the bundle reaches a Node built-in. Workspace packages depend on each other by exact version (`"@varanda/rpc": "0.1.0"`).
+
+Why some pins are what they are (chosen on 2026-10-22, preferring releases at least two weeks old):
+
+- `expo` 55.0.31 and `react-native` 0.83.10, from `expo-template-blank` 55.1.38. SDK 55 is the line Holepunch's bare-expo example uses; the later 55.0.32 was one day old.
+- The Expo-managed packages (`react-dom`, `react-native-web`, `@expo/metro-runtime`, `expo-file-system`, `expo-build-properties`, `react-native-safe-area-context`) take the versions in `expo/bundledNativeModules.json`. `react-native-web` is 0.21.3 rather than 0.21.4, which was two weeks old.
+- `bare-pack` 2.2.4, not the 3.x line. 3.0.0 is a major released after `react-native-bare-kit` 0.16.0; 2.2.4 shipped the same day as bare-kit 0.16.0 and has the same `--linked`, `--host` and `--format` options.
+- `bare-runtime` 1.34.1 (dev only, packages/core), for the desktop Bare smoke test.
+- `npm audit` reports advisories in the Expo and React Native build toolchain (braces/micromatch, node-forge). npm's only fixes are majors outside SDK 55, and these packages run at build time on the developer's machine, not in the app.

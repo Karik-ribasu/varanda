@@ -69,7 +69,8 @@ function close () {
 // since the bare-kit IPC carries no end-of-stream from React Native. The
 // session is detached and closed (any sync stopped, every store closed, the
 // data-dir lock released) BEFORE the response; once the response is
-// written, finish() ends the stream and later frames are ignored.
+// written, finish() stops accepting frames (the stream stays open until the
+// host terminates the worklet).
 async function nodeClose () {
   await session.detach()
   await session.close()
