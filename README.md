@@ -352,7 +352,7 @@ Opções (`--help` imprime a lista):
 - `--public-dht`: usa a DHT pública. Aqui ela é opt-in: sem `--bootstrap` (ou `VARANDA_BOOTSTRAP`) e sem `--public-dht` o servidor recusa com `uso: informe --bootstrap ou --public-dht`. As duas juntas também são erro de uso.
 - `--data`, `--association`, `--bootstrap`, `--dht-host` e as variáveis `VARANDA_*` funcionam como no `varanda`. Sem `--association`, vale a associação do `config.json` de membro já existente.
 
-O token vem de `VARANDA_SERVE_TOKEN` (32 a 256 caracteres de `A-Z a-z 0-9 _ -`, senão `uso: VARANDA_SERVE_TOKEN inválido`) ou são 32 bytes aleatórios em 64 dígitos hexadecimais. Não existe opção `--token`: a linha de comando é visível a todo usuário local em `ps`.
+O token são 32 bytes aleatórios (64 dígitos hexadecimais), gerados a cada início. Não existe opção `--token` (a linha de comando é visível a todo usuário local em `ps`) nem token fixo: `VARANDA_SERVE_TOKEN` é recusado (`uso: VARANDA_SERVE_TOKEN não é aceito: o token é gerado a cada início`). O endereço impresso é uma credencial enquanto o processo roda: a página tira o token da barra de endereço, mas o navegador pode guardar a visita no histórico. Prefira abrir o endereço numa janela anônima e encerre o `varanda-serve` quando terminar; ao reiniciar, abra o endereço novo.
 
 Recusas antes de escutar (código 2, `uso: <mensagem>`): diretório de semeador ou de associação (`uso: diretório não é de um membro`), chave ou bootstrap inválidos, nenhuma origem permitida (`uso: informe --origin ou --ui`), opção desconhecida. Porta ocupada: `erro: porta em uso`, código 1.
 

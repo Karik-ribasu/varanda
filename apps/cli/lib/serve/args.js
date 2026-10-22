@@ -3,8 +3,9 @@
 // Command line of varanda-serve. Its own flags are parsed here; the member
 // flags (--data, --association, --bootstrap, --dht-host) and the VARANDA_*
 // variables go through the CLI's parseArgs unchanged. Everything else is
-// 'opção desconhecida'. The token is never a flag (visible in `ps`): it comes
-// from VARANDA_SERVE_TOKEN or is generated.
+// 'opção desconhecida'. The token is never a flag (visible in `ps`) and never
+// a fixed value: it is generated on every start, so a URL left in the
+// browser's history stops working when the process ends.
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -15,7 +16,7 @@ const { readConfig } = require('@varanda/core/lib/store')
 
 const HELP = `varanda-serve — nó Varanda local para a interface web
 Uso: node bin/varanda-serve.js [opções]
-Escuta só em 127.0.0.1. O token vem de VARANDA_SERVE_TOKEN ou é gerado e impresso uma vez.
+Escuta só em 127.0.0.1. O token é gerado a cada início e impresso uma vez.
 Opções:
   --port <n>                 porta local (padrão 8787; 0 = qualquer porta livre)
   --origin <url>             origem permitida no WebSocket, repetível (ex.: http://localhost:8081)
@@ -29,7 +30,6 @@ Opções:
 
 const DEFAULT_PORT = 8787
 const DEFAULT_OPEN_TIMEOUT_MS = 5000
-const TOKEN_RE = /^[A-Za-z0-9_-]{32,256}$/
 
 const memberFlags = new Set(['--data', '--association', '--bootstrap', '--dht-host'])
 const ownStringFlags = new Set(['--port', '--origin', '--ui'])
@@ -65,11 +65,11 @@ function uiRoot (value, cwd) {
   return real
 }
 
+// A fixed token would keep a URL recorded in the browser's history valid
+// across restarts, so the old variable is refused instead of ignored.
 function resolveToken (env) {
-  const given = env.VARANDA_SERVE_TOKEN
-  if (given === undefined) return b4a.toString(randomBytes(32), 'hex')
-  if (!TOKEN_RE.test(given)) throw new UsageError('VARANDA_SERVE_TOKEN inválido')
-  return given
+  if (env.VARANDA_SERVE_TOKEN !== undefined) throw new UsageError('VARANDA_SERVE_TOKEN não é aceito: o token é gerado a cada início')
+  return b4a.toString(randomBytes(32), 'hex')
 }
 
 // Test hook only (README): a shorter session.open deadline, never a longer one.

@@ -13,6 +13,7 @@ class AppDelegate: ExpoAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    excludeNodeDataFromBackup()
     let delegate = ReactNativeDelegate()
     let factory = ExpoReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -29,6 +30,22 @@ class AppDelegate: ExpoAppDelegate {
 #endif
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  // The node's data dir (Documents/varanda, apps/app/src/client/native.js)
+  // holds the key material of the member's diary: keep it out of iCloud and
+  // device backups. The attribute on the directory covers everything in it.
+  private func excludeNodeDataFromBackup() {
+    guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+    var dir = documents.appendingPathComponent("varanda", isDirectory: true)
+    do {
+      try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+      var values = URLResourceValues()
+      values.isExcludedFromBackup = true
+      try dir.setResourceValues(values)
+    } catch {
+      NSLog("varanda: could not exclude the node data from backup: %@", error.localizedDescription)
+    }
   }
 
   // Linking API

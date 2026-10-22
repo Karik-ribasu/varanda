@@ -104,15 +104,27 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // Release signing comes only from outside the repository (e.g.
+        // ~/.gradle/gradle.properties): the debug keystore above is public, so
+        // a release signed with it could be "updated" by anyone. Without these
+        // properties a release build fails at signing.
+        release {
+            if (findProperty('VARANDA_RELEASE_STORE_FILE')) {
+                storeFile file(findProperty('VARANDA_RELEASE_STORE_FILE'))
+                storePassword findProperty('VARANDA_RELEASE_STORE_PASSWORD')
+                keyAlias findProperty('VARANDA_RELEASE_KEY_ALIAS')
+                keyPassword findProperty('VARANDA_RELEASE_KEY_PASSWORD')
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+            // A debug build (public key) can never update a release install.
+            applicationIdSuffix '.debug'
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

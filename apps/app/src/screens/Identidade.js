@@ -39,7 +39,9 @@ export default function Identidade ({ active }) {
     setDone('')
     let cert
     try {
-      cert = JSON.parse(certText)
+      // iOS smart punctuation turns typed " into curly quotes; a certificate
+      // holds only ASCII values, so they are read back as plain quotes.
+      cert = JSON.parse(certText.replace(/[“”„‟″]/g, '"'))
     } catch {
       return setCertLocal('JSON inválido')
     }

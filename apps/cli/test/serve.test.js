@@ -336,8 +336,7 @@ test('refusals before listening', async (t) => {
     ['VARANDA_BOOTSTRAP with --public-dht', ['--data', m.dataDir, '--association', m.association, '--public-dht', '--origin', ORIGIN], { VARANDA_BOOTSTRAP: m.bootstrap.join(',') }, /^uso: --bootstrap e --public-dht são exclusivos\n/],
     ['no allowed origin', memberArgs(m), {}, /^uso: informe --origin ou --ui\n/],
     ['bad origin', [...memberArgs(m), '--origin', 'http://localhost:8081/'], {}, /^uso: origem inválida /],
-    ['short token', [...memberArgs(m), '--origin', ORIGIN], { VARANDA_SERVE_TOKEN: 'abc' }, /^uso: VARANDA_SERVE_TOKEN inválido\n/],
-    ['token with bad chars', [...memberArgs(m), '--origin', ORIGIN], { VARANDA_SERVE_TOKEN: 'a'.repeat(40) + ' !' }, /^uso: VARANDA_SERVE_TOKEN inválido\n/],
+    ['a fixed token is refused', [...memberArgs(m), '--origin', ORIGIN], { VARANDA_SERVE_TOKEN: 'T'.repeat(48) }, /^uso: VARANDA_SERVE_TOKEN não é aceito: o token é gerado a cada início\n/],
     ['token flag does not exist', [...memberArgs(m), '--origin', ORIGIN, '--token', 'a'.repeat(64)], {}, /^uso: opção desconhecida --token\n/],
     ['host flag does not exist', [...memberArgs(m), '--origin', ORIGIN, '--host', '0.0.0.0'], {}, /^uso: opção desconhecida --host\n/],
     ['no association', ['--data', m.dataDir, ...bootstrapFlags(m.bootstrap), '--origin', ORIGIN], {}, /^uso: informe --association <hex>\n/],
@@ -354,8 +353,8 @@ test('refusals before listening', async (t) => {
 
 test('EADDRINUSE and SIGTERM releases the data dir', async (t) => {
   const m = await member(t)
-  const s = await serve(t, [...memberArgs(m), '--origin', ORIGIN], { VARANDA_SERVE_TOKEN: 'T'.repeat(48) })
-  t.is(s.token, 'T'.repeat(48), 'VARANDA_SERVE_TOKEN is used')
+  const s = await serve(t, [...memberArgs(m), '--origin', ORIGIN])
+  t.ok(HEX64.test(s.token), 'a fresh 64-hex token')
 
   const other = tmpDir(t)
   const busy = spawnSync(process.execPath, [SERVE, '--port', String(s.port), '--data', other, '--association', m.association, ...bootstrapFlags(m.bootstrap), '--origin', ORIGIN], { env: baseEnv, encoding: 'utf8', timeout: 30000 })

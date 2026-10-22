@@ -85,7 +85,7 @@ Runs `npm run demo -w apps/cli`, that is `node scripts/demo.js`: an automatic wa
 
 ```sh
 cd apps/app
-npx expo export --platform web      # writes the static site (Expo's default output directory is dist; check the command output)
+npx expo export --platform web      # writes the static site to apps/app/dist ("Exported: dist")
 cd ../..
 node bin/varanda-serve.js --data ./data --association <hex> \
   --bootstrap <host:port> --dht-host 127.0.0.1 --ui apps/app/dist
@@ -93,7 +93,7 @@ node bin/varanda-serve.js --data ./data --association <hex> \
 
 Use `--public-dht` instead of `--bootstrap` to opt in to the public DHT. The server prints the URL with the token in the fragment once. Open that URL. Without `--ui`, serve the web build with `npm run web -w apps/app` (Expo dev server) and pass its exact origin with `--origin http://localhost:8081`.
 
-The `dist` directory is ignored by version control. The web export itself has not been run for this document: confirm the output directory it reports before relying on `apps/app/dist`.
+The `dist` directory is ignored by version control. The export was run on 2026-10-22 (see [verification.md](verification.md)): it reports `Exported: dist` and writes `apps/app/dist/index.html`, `favicon.ico`, `metadata.json` and the bundle under `apps/app/dist/_expo/static/js/web/`.
 
 ## iOS
 
@@ -111,12 +111,14 @@ npm run ios                          # expo run:ios
 
 - `link:addons` runs `scripts/link-addons.sh`. It fails unless rocksdb-native, udx-native, sodium-native and bare-fs are linked for every platform it handles. The linked addons live in `node_modules/react-native-bare-kit`, so every install wipes them.
 - `pack:worklet` runs `scripts/pack-worklet.sh` and writes `apps/app/assets/worklet/main.bundle.js` (generated and ignored by version control).
-- `ios/` and `android/` are committed. Regenerate them only with `npx expo prebuild --no-install` from `apps/app`.
+- `ios/` and `android/` are committed. Regenerate them only with `npx expo prebuild --no-install` from `apps/app`, and never with `--clean` without re-applying three hand edits that prebuild does not generate: `ios/Varanda/AppDelegate.swift` marks `Documents/varanda` (the node's key material) as excluded from iCloud and device backups; `android/app/build.gradle` signs release builds only with a key supplied outside the repository and gives debug builds the `.debug` application ID suffix. Android's `allowBackup: false` is in `app.json`, so prebuild keeps it.
 - `npm run gate -w apps/app` is the gate driver (`scripts/gate-server.js`), used with a Metro started with `EXPO_PUBLIC_VARANDA_GATE_URL`. See ios-gate.md.
 
 ## Android
 
-Status: prebuild and `npx expo export --platform android` were checked, and bare-link produces the `.so` addons for arm64-v8a and x86_64. No native Android run is verified (no SDK or Java on the Mac used). `npm run android` is `expo run:android`; an emulator run must still confirm that the addons are picked up. See "Residual risks" in [ios-gate.md](ios-gate.md).
+Status: prebuild and `npx expo export --platform android` were checked, and bare-link produces the `.so` addons for arm64-v8a and x86_64. No native Android run is verified (no SDK or Java on the Mac used). `npm run android` is `expo run:android`; an emulator run must still confirm that the addons are picked up.
+
+Release signing: the committed `debug.keystore` is the public React Native debug key, so it signs debug builds only (application ID `app.varanda.debug`). A release build reads `VARANDA_RELEASE_STORE_FILE`, `VARANDA_RELEASE_STORE_PASSWORD`, `VARANDA_RELEASE_KEY_ALIAS` and `VARANDA_RELEASE_KEY_PASSWORD` from Gradle properties kept outside the repository (for example `~/.gradle/gradle.properties`) and fails at signing without them. Backups are off (`android:allowBackup="false"`), so the node's key material is not copied to cloud backups. None of this was built here (no Java on the Mac used). See "Residual risks" in [ios-gate.md](ios-gate.md).
 
 ## Adding a dependency
 
