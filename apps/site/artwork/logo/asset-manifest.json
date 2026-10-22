@@ -1,0 +1,374 @@
+{
+  "generator": "apps/site/scripts/render-assets.js",
+  "rsvgConvert": "2.61.1",
+  "outputs": [
+    {
+      "path": "apps/app/assets/icon.png",
+      "source": "apps/site/artwork/logo/icon-ios.svg",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 70923,
+      "sha256": "7ed9433584afd3e8a26a7e72d918cb0cabb89fab84f21089fcac26d101d91e60"
+    },
+    {
+      "path": "apps/app/assets/splash-icon.png",
+      "source": "apps/site/artwork/logo/splash.svg",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 36953,
+      "sha256": "cd0e5b9f4f0291b15318f6bb7d4e5a2019296a2f3fb080d8e815ce8ee637226f"
+    },
+    {
+      "path": "apps/app/assets/favicon.png",
+      "source": "apps/site/artwork/logo/mark.svg",
+      "width": 48,
+      "height": 48,
+      "bytes": 2981,
+      "sha256": "d6c2eb82848fa1184f05ad422db49cefb87a93ff60b8275f84c3e7d590242b39"
+    },
+    {
+      "path": "apps/app/assets/android-icon-foreground.png",
+      "source": "apps/site/artwork/logo/icon-android-foreground.svg",
+      "width": 512,
+      "height": 512,
+      "bytes": 21304,
+      "sha256": "2db64c11d6bcab85620bf1335e1e067366e0a120351a0df363a38131744ebd6c"
+    },
+    {
+      "path": "apps/app/assets/android-icon-background.png",
+      "source": "apps/site/artwork/logo/icon-android-background.svg",
+      "width": 512,
+      "height": 512,
+      "bytes": 1942,
+      "sha256": "32a2bb5cc807e91e3d87f07c9b226f12732a601cf9ca94d144233ccaf9714b59"
+    },
+    {
+      "path": "apps/app/assets/android-icon-monochrome.png",
+      "source": "apps/site/artwork/logo/icon-android-monochrome.svg",
+      "width": 432,
+      "height": 432,
+      "bytes": 16483,
+      "sha256": "413e6445c7b6f5ff66905858ca40a699a6a1775ab39c3944248b5ddd4ffe62f0"
+    },
+    {
+      "path": "apps/app/ios/Varanda/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
+      "source": "apps/site/artwork/logo/icon-ios.svg",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 70923,
+      "sha256": "7ed9433584afd3e8a26a7e72d918cb0cabb89fab84f21089fcac26d101d91e60"
+    },
+    {
+      "path": "apps/app/ios/Varanda/Images.xcassets/SplashScreenLegacy.imageset/image.png",
+      "source": "apps/site/artwork/logo/splash.svg",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 36953,
+      "sha256": "cd0e5b9f4f0291b15318f6bb7d4e5a2019296a2f3fb080d8e815ce8ee637226f"
+    },
+    {
+      "path": "apps/app/ios/Varanda/Images.xcassets/SplashScreenLegacy.imageset/image@2x.png",
+      "source": "apps/site/artwork/logo/splash.svg",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 36953,
+      "sha256": "cd0e5b9f4f0291b15318f6bb7d4e5a2019296a2f3fb080d8e815ce8ee637226f"
+    },
+    {
+      "path": "apps/app/ios/Varanda/Images.xcassets/SplashScreenLegacy.imageset/image@3x.png",
+      "source": "apps/site/artwork/logo/splash.svg",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 36953,
+      "sha256": "cd0e5b9f4f0291b15318f6bb7d4e5a2019296a2f3fb080d8e815ce8ee637226f"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-mdpi/ic_launcher.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy.svg",
+      "width": 48,
+      "height": 48,
+      "bytes": 1343,
+      "sha256": "a6ae92aceb225d6fc325ded4a79c35d32152db0064327355d7f396e15a97c6ac"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy-round.svg",
+      "width": 48,
+      "height": 48,
+      "bytes": 2141,
+      "sha256": "e7c91d6fcdbc684ad45df441019d341f840e9442ca464e3cc1f07a7fffc54fb7"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.webp",
+      "source": "apps/site/artwork/logo/icon-android-foreground.svg",
+      "width": 108,
+      "height": 108,
+      "bytes": 3737,
+      "sha256": "c07c83946d2a50ef0a341746b5f69586e991c384ecd2a95b167a60b9aebf895a"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-mdpi/ic_launcher_background.webp",
+      "source": "apps/site/artwork/logo/icon-android-background.svg",
+      "width": 108,
+      "height": 108,
+      "bytes": 303,
+      "sha256": "86c8c97050b12a7a32ac62683012d396d532e054cb6d90a823d93df106d74d00"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-mdpi/ic_launcher_monochrome.webp",
+      "source": "apps/site/artwork/logo/icon-android-monochrome.svg",
+      "width": 108,
+      "height": 108,
+      "bytes": 3375,
+      "sha256": "c9146bbd67e3e28f6cdc71a730381e49b5a2ffd24af1bc2e555a5def205965cd"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-hdpi/ic_launcher.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy.svg",
+      "width": 72,
+      "height": 72,
+      "bytes": 2317,
+      "sha256": "497a455537355bbaf49492e82e4556570c3aa74c0c0cf6a6ed06fee52ef330c0"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy-round.svg",
+      "width": 72,
+      "height": 72,
+      "bytes": 3581,
+      "sha256": "f4a999b87669cf74a51ed392b7e04836243c0a6c26a4f18503311dc3f368ff54"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.webp",
+      "source": "apps/site/artwork/logo/icon-android-foreground.svg",
+      "width": 162,
+      "height": 162,
+      "bytes": 6015,
+      "sha256": "a40ef843d17fe39fc286afb7935c42e645550aa567fea4819f85266be862a156"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-hdpi/ic_launcher_background.webp",
+      "source": "apps/site/artwork/logo/icon-android-background.svg",
+      "width": 162,
+      "height": 162,
+      "bytes": 472,
+      "sha256": "82aa93871bf67e71a70aaf4ce2042aacf4da253f3bd2a9ba58e00bd7a2b49886"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-hdpi/ic_launcher_monochrome.webp",
+      "source": "apps/site/artwork/logo/icon-android-monochrome.svg",
+      "width": 162,
+      "height": 162,
+      "bytes": 5548,
+      "sha256": "2691611db5243734af3f7bea7fe4004cbc22d39d7cf4c25cd64b2c8038f616bb"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xhdpi/ic_launcher.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy.svg",
+      "width": 96,
+      "height": 96,
+      "bytes": 3400,
+      "sha256": "be57422934e1b774af2a6a36724f63f83ac0a471cae05be2588924ff93041ee6"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy-round.svg",
+      "width": 96,
+      "height": 96,
+      "bytes": 5133,
+      "sha256": "be08517513627931cefcb1ebbd4174c9ea1af1f64aec0462d03fb349bf71b6ca"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.webp",
+      "source": "apps/site/artwork/logo/icon-android-foreground.svg",
+      "width": 216,
+      "height": 216,
+      "bytes": 8244,
+      "sha256": "ccd616ebff049678f4f1919963dc29bb8c681fb763ff174f171775035b020f27"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xhdpi/ic_launcher_background.webp",
+      "source": "apps/site/artwork/logo/icon-android-background.svg",
+      "width": 216,
+      "height": 216,
+      "bytes": 627,
+      "sha256": "8c485558380076cfa2863b834078419a1ea8e67dd0656a0bbba2be7d9d7e716e"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xhdpi/ic_launcher_monochrome.webp",
+      "source": "apps/site/artwork/logo/icon-android-monochrome.svg",
+      "width": 216,
+      "height": 216,
+      "bytes": 7702,
+      "sha256": "5c6f6e9959d1886f2c882be9b09c890a0319f763d98f386679978f9af05530e5"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy.svg",
+      "width": 144,
+      "height": 144,
+      "bytes": 5513,
+      "sha256": "a6acb99e99d4b2339b09a8814b1198e374e5c13d88baa582d5e71f3edd3eb533"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy-round.svg",
+      "width": 144,
+      "height": 144,
+      "bytes": 8033,
+      "sha256": "f05ac625b52dc5371e1e3d554d48ed09ecca1d0c067e30db50688a048c26ddc8"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.webp",
+      "source": "apps/site/artwork/logo/icon-android-foreground.svg",
+      "width": 324,
+      "height": 324,
+      "bytes": 12797,
+      "sha256": "34fdd47e645397d58ae2cd7224a08962a1e8ab0c2e405f7f0a5a64160f91552b"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_background.webp",
+      "source": "apps/site/artwork/logo/icon-android-background.svg",
+      "width": 324,
+      "height": 324,
+      "bytes": 897,
+      "sha256": "9f2b90986811dba6285b0ce98f2203cad87172ab60452214385a8e2f4f573c72"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_monochrome.webp",
+      "source": "apps/site/artwork/logo/icon-android-monochrome.svg",
+      "width": 324,
+      "height": 324,
+      "bytes": 12021,
+      "sha256": "7ce3723bee0af6d3e4433b349892173620142e417aa9b04c2528b3651a13e9df"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy.svg",
+      "width": 192,
+      "height": 192,
+      "bytes": 7696,
+      "sha256": "ffa67bbb8b34fda139840f62e0fa8c4ed7119ac84ae907d16a0327f9873e3823"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp",
+      "source": "apps/site/artwork/logo/icon-android-legacy-round.svg",
+      "width": 192,
+      "height": 192,
+      "bytes": 11094,
+      "sha256": "27576b32094ae8951f131b24f9099c2f77ee9d1f5966921cc27f93d97da9ccf3"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp",
+      "source": "apps/site/artwork/logo/icon-android-foreground.svg",
+      "width": 432,
+      "height": 432,
+      "bytes": 17609,
+      "sha256": "2694f73ac940b1bd72e6a07213f02a339eaceb60491762474fa16d5cfd6807e9"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_background.webp",
+      "source": "apps/site/artwork/logo/icon-android-background.svg",
+      "width": 432,
+      "height": 432,
+      "bytes": 1545,
+      "sha256": "f3478a32db33e13e4d2085d98a594384de8c6f1b88d4ecabe335c1d5315a5598"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_monochrome.webp",
+      "source": "apps/site/artwork/logo/icon-android-monochrome.svg",
+      "width": 432,
+      "height": 432,
+      "bytes": 16483,
+      "sha256": "413e6445c7b6f5ff66905858ca40a699a6a1775ab39c3944248b5ddd4ffe62f0"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/drawable-mdpi/splashscreen_logo.png",
+      "source": "apps/site/artwork/logo/splash.svg",
+      "width": 288,
+      "height": 288,
+      "bytes": 9063,
+      "sha256": "95af7eb92e18d2645cf47dc507b63e076def5f5ce03275319e6e030bb11f7128"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/drawable-hdpi/splashscreen_logo.png",
+      "source": "apps/site/artwork/logo/splash.svg",
+      "width": 432,
+      "height": 432,
+      "bytes": 14308,
+      "sha256": "0bdd02b524842b84c849b3ec4eb3233427349e52bc20e6cda6532fc4bee53b3b"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/drawable-xhdpi/splashscreen_logo.png",
+      "source": "apps/site/artwork/logo/splash.svg",
+      "width": 576,
+      "height": 576,
+      "bytes": 19751,
+      "sha256": "c3522c1614a57b5e7bfcc76cd0141ae1ae7d359731b1f5da5445bdf1a0af66b6"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/drawable-xxhdpi/splashscreen_logo.png",
+      "source": "apps/site/artwork/logo/splash.svg",
+      "width": 864,
+      "height": 864,
+      "bytes": 30912,
+      "sha256": "7f7eb04f91c5d8c1796c56abdbc814705c50a40342860af7adfe0cbd995e05af"
+    },
+    {
+      "path": "apps/app/android/app/src/main/res/drawable-xxxhdpi/splashscreen_logo.png",
+      "source": "apps/site/artwork/logo/splash.svg",
+      "width": 1152,
+      "height": 1152,
+      "bytes": 42230,
+      "sha256": "7b397ad5e8e2ace559032b12ff297ae935861c8fb63e18119582a1a7671ba5a4"
+    },
+    {
+      "path": "apps/site/public/favicon.svg",
+      "source": "apps/site/artwork/logo/favicon.svg",
+      "width": 16,
+      "height": 16,
+      "bytes": 482,
+      "sha256": "050773ca3154fe173ace3257a64078fe18bc65774a4b2713efcbf16855bc4b27"
+    },
+    {
+      "path": "apps/site/public/favicon-32.png",
+      "source": "apps/site/artwork/logo/favicon.svg",
+      "width": 32,
+      "height": 32,
+      "bytes": 926,
+      "sha256": "44b4f134b57bd1ad6cf201140ad5285178a09df8c5d90206ec5d96b9ab2004ac"
+    },
+    {
+      "path": "apps/site/public/apple-touch-icon.png",
+      "source": "apps/site/artwork/logo/icon-ios.svg",
+      "width": 180,
+      "height": 180,
+      "bytes": 11162,
+      "sha256": "20a121a866065ce0b38d4329baa25f76a4eede9825fc4c86f2ee24336ad1c821"
+    },
+    {
+      "path": "apps/site/public/assets/logo-lockup.svg",
+      "source": "apps/site/artwork/logo/lockup-horizontal.svg",
+      "width": 785,
+      "height": 224,
+      "bytes": 14434,
+      "sha256": "11a56d7b5e7db217c009061f5774a054c846200c29fef22121c06ee4275bce54"
+    },
+    {
+      "path": "apps/site/public/assets/logo-mark.svg",
+      "source": "apps/site/artwork/logo/mark.svg",
+      "width": 256,
+      "height": 256,
+      "bytes": 7008,
+      "sha256": "cd7fe6a004d13f98ccce10cc452a6cfe4cd0dc237f7ff749526947e12daf404c"
+    },
+    {
+      "path": "apps/site/public/assets/cadeira.svg",
+      "source": "apps/site/artwork/logo/chair.svg",
+      "width": 256,
+      "height": 256,
+      "bytes": 6953,
+      "sha256": "410e73a3095eece60e5363d5c662e2dd2b3fa71eb6c886a38876d98364dcdf5a"
+    }
+  ]
+}

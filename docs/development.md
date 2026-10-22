@@ -120,6 +120,19 @@ Status: prebuild and `npx expo export --platform android` were checked, and bare
 
 Release signing: the committed `debug.keystore` is the public React Native debug key, so it signs debug builds only (application ID `app.varanda.debug`). A release build reads `VARANDA_RELEASE_STORE_FILE`, `VARANDA_RELEASE_STORE_PASSWORD`, `VARANDA_RELEASE_KEY_ALIAS` and `VARANDA_RELEASE_KEY_PASSWORD` from Gradle properties kept outside the repository (for example `~/.gradle/gradle.properties`) and fails at signing without them. Backups are off (`android:allowBackup="false"`), so the node's key material is not copied to cloud backups. None of this was built here (no Java on the Mac used). See "Residual risks" in [ios-gate.md](ios-gate.md).
 
+## Site and brand assets
+
+The landing page is static: `apps/site/public` is the deployable root, while `apps/site/artwork` (logo sources, `og.html`, `screens.md`) and `apps/site/scripts` are sources and are never uploaded. See [site.md](site.md) (in Portuguese) for the publishing steps.
+
+```sh
+npm run dev -w apps/site                                  # http://127.0.0.1:4173/
+node apps/site/scripts/serve.js --prefix /varanda         # as it will look under /varanda
+node apps/site/scripts/render-assets.js                   # regenerate every icon, splash and favicon
+node apps/site/scripts/render-assets.js --check           # verify without writing
+```
+
+`render-assets.js` needs `rsvg-convert` (`brew install librsvg`); `cwebp` (`brew install webp`) is only for the screenshot recipe in `apps/site/artwork/screens.md`. The Android mipmaps are PNG bytes under `.webp` names, as Expo writes them. Never use `npx expo prebuild` to regenerate icons: `apps/app/ios/Varanda/AppDelegate.swift` (backup exclusion) and `apps/app/android/app/build.gradle` (release signing) carry hand-made security fixes that prebuild would overwrite (see [verification.md](verification.md)). After any `npm ci`, run `npm run link:addons -w apps/app` again before an iOS build.
+
 ## Adding a dependency
 
 Every dependency in every `package.json` uses an exact version: no `^`, no `~`, no ranges. The lockfile stays at the root.
