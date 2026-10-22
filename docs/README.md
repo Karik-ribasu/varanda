@@ -11,6 +11,7 @@
 | [app.md](app.md) | pt-BR | O que o aplicativo faz hoje, as telas, o nó no app contra o cliente web, o que ficou fora do piloto. |
 | [ios-gate.md](ios-gate.md) | inglês | A prova de que o nó real roda no worklet Bare do app no simulador iOS: como é montado, os passos, a evidência e os riscos restantes. |
 | [verification.md](verification.md) | inglês | A verificação de ponta a ponta do monorepo: CLI, navegador pelo `varanda-serve` e simulador iOS sincronizando entre si, as checagens de vazamento, o que não foi verificado e as correções da auditoria de segurança. |
+| [site.md](site.md) | pt-BR | O site estático (varanda.app): como ver, atualizar e publicar na GitHub Pages, os passos de domínio e DNS que só o usuário faz, e a verificação depois de publicar. |
 
 O README da raiz ([../README.md](../README.md)) descreve o programa de linha de comando e o `varanda-serve`.
 
@@ -20,5 +21,6 @@ O README da raiz ([../README.md](../README.md)) descreve o programa de linha de 
 |---|---|---|
 | `apps/cli` | `varanda`: o programa de linha de comando, o semeador, a demo e o `varanda-serve` | [apps/cli/README.md](../apps/cli/README.md) |
 | `apps/app` | `@varanda/app`: o aplicativo Expo / React Native (iOS, Android e web) e o worklet Bare | [apps/app/README.md](../apps/app/README.md) |
+| `apps/site` | `@varanda/site`: o site estático, o logotipo e os scripts de ícones | [apps/site/README.md](../apps/site/README.md) |
 | `packages/core` | `@varanda/core`: registros, certificados, armazenamento, rede, sincronização e a sessão do nó | [packages/core/README.md](../packages/core/README.md) |
 | `packages/rpc` | `@varanda/rpc`: o contrato JSON entre interface e nó | [packages/rpc/README.md](../packages/rpc/README.md) |

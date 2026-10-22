@@ -12,4 +12,6 @@ Pontos de entrada:
 
 Comandos (a partir da raiz, com `-w apps/app`, ou aqui dentro): `npm run link:addons`, `npm run pack:worklet`, `npm run ios`, `npm run android`, `npm run web`, `npm run start`, `npm run gate`. Não há script de teste neste pacote. Depois de qualquer `npm install`, rode `link:addons` de novo antes de um build nativo.
 
+Os PNGs do ícone e da tela de abertura são gerados a partir de `apps/site/artwork/logo` por `apps/site/scripts/render-assets.js`; nunca os regenere com `expo prebuild`, que sobrescreveria as correções de segurança feitas à mão em `ios/` e `android/`.
+
 Documentação: [docs/app.md](../../docs/app.md) (o que o app faz e as telas) e [docs/development.md](../../docs/development.md) (como construir). O contrato com o nó está em [docs/rpc.md](../../docs/rpc.md).
