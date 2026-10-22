@@ -18,17 +18,17 @@ const bad = (t, method, params, label) => {
 test('method list and mutating set', (t) => {
   t.alike([...METHODS].sort(), [
     'cert.add', 'feed.read', 'follow.add', 'follow.list', 'follow.remove', 'identity.create',
-    'identity.show', 'log.read', 'node.info', 'post.create', 'post.reply', 'profile.set',
+    'identity.show', 'log.read', 'node.close', 'node.info', 'post.create', 'post.reply', 'profile.set',
     'session.open', 'sync.start', 'sync.status', 'sync.stop'
   ])
   t.alike([...MUTATING].sort(), [
-    'cert.add', 'follow.add', 'follow.remove', 'identity.create', 'post.create', 'post.reply',
+    'cert.add', 'follow.add', 'follow.remove', 'identity.create', 'node.close', 'post.create', 'post.reply',
     'profile.set', 'sync.start', 'sync.stop'
   ])
 })
 
 test('no-param methods reject any key', (t) => {
-  for (const m of ['node.info', 'identity.create', 'identity.show', 'sync.stop', 'sync.status']) {
+  for (const m of ['node.info', 'identity.create', 'identity.show', 'sync.stop', 'sync.status', 'node.close']) {
     ok(t, m, {}, {})
     bad(t, m, { x: 1 })
     // No method takes node configuration.

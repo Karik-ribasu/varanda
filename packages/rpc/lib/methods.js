@@ -105,7 +105,10 @@ const SPECS = {
     }
   },
   'sync.stop': { fields: none, mutating: true },
-  'sync.status': { fields: none }
+  'sync.status': { fields: none },
+  // IPC only: offered by the in-app worklet (apps/app/worklet/main.js), not
+  // by the node session or varanda-serve (docs/rpc.md 5.17).
+  'node.close': { fields: none, mutating: true }
 }
 
 const METHODS = Object.freeze(Object.keys(SPECS))

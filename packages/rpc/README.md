@@ -22,4 +22,4 @@ await client.request('session.open', { token })
 const { items } = await client.request('feed.read', { limit: 30 })
 ```
 
-Testes: `npm test -w packages/rpc`.
+Testes: `npm test -w packages/rpc`. Mais: [docs/rpc.md](../../docs/rpc.md) e [docs/README.md](../../docs/README.md).

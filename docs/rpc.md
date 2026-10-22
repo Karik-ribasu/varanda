@@ -85,7 +85,7 @@ One text frame per message, no length prefix. A binary frame is a protocol error
 
 ## 5. Methods
 
-Mutating methods (`MUTATING`, exported as a frozen array; test with `isMutating(method)`): `identity.create`, `cert.add`, `profile.set`, `post.create`, `post.reply`, `follow.add`, `follow.remove`, `sync.start`, `sync.stop`. All others are reads.
+Mutating methods (`MUTATING`, exported as a frozen array; test with `isMutating(method)`): `identity.create`, `cert.add`, `profile.set`, `post.create`, `post.reply`, `follow.add`, `follow.remove`, `sync.start`, `sync.stop`, `node.close`. All others are reads.
 
 Params have an exact key set: every key not listed for the method -> `USAGE` `'parâmetro desconhecido'`; a missing required key -> `'parâmetro obrigatório: <name>'`; a wrong type or bound -> `'parâmetro inválido: <name>'`. Defaults listed below are filled in by `validateRequest` / `validateParams(method, params)` before the handler runs; the client sends the params exactly as given.
 
@@ -183,6 +183,13 @@ Results keep the field names of the CLI `--json` output (protocol §7, `apps/cli
 
 - Params: `{}`.
 - Result (SyncState): `{ state: 'idle' }` or `{ state: 'running', runId, once }`.
+
+### 5.17 `node.close` (IPC only)
+
+- Params: `{}`.
+- Result: `{ closed: true }`.
+- Offered only by the in-app worklet (`apps/app/worklet/main.js`), next to the session's handlers; the node session itself (`session.handlers`) and `varanda-serve` do not register it, so over the WebSocket it reaches no handler and the dispatcher answers `INTERNAL` `'erro interno'` (section 8, step 6).
+- The worklet detaches and closes the node session (any running sync is stopped and awaited, every store is closed and the data-dir lock released), then sends this response, then ends its side of the IPC stream and ignores every later frame. The host terminates the worklet after the response; only a received response means a clean stop, after which the next worklet needs no lock takeover (`recover`). Needed because the bare-kit IPC has no end-of-stream signal from the React Native side.
 
 ### Errors common to every method
 

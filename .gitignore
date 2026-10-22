@@ -11,4 +11,5 @@ apps/app/ios/build/
 apps/app/android/build/
 apps/app/android/.gradle/
 apps/app/android/app/build/
+apps/app/assets/worklet/
 *.bundle

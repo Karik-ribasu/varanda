@@ -4,10 +4,13 @@ Protótipo de fase 0 de uma rede social ponto a ponto no Holepunch (Hypercore, H
 
 ## Estrutura do repositório
 
-- `apps/cli`: o programa de linha de comando (protótipo de fase 0).
-- `apps/app`: aplicativo iOS, Android e web (em construção).
-- `packages/core` e `packages/rpc`: bibliotecas compartilhadas (em construção).
-- `docs/`: `protocol.md` (referência normativa); `design.md` será publicado.
+É um monorepo npm (workspaces `packages/*` e `apps/*`, um só `package-lock.json` na raiz).
+
+- `apps/cli`: o programa de linha de comando (`varanda`, `varanda-serve`), o semeador e a demo. [README](apps/cli/README.md).
+- `apps/app`: aplicativo iOS, Android e web, com o worklet Bare que roda o nó (a interface está em construção). [README](apps/app/README.md).
+- `packages/core`: o núcleo do protocolo e a sessão do nó, usados pelo CLI e pelo app (Node e Bare). [README](packages/core/README.md).
+- `packages/rpc`: o contrato JSON entre a interface e o nó. [README](packages/rpc/README.md).
+- `docs/`: `protocol.md` (referência normativa dos formatos), `rpc.md` (contrato da interface), `design.md` (documento de design), `development.md`, `app.md` e `ios-gate.md`. O índice está em [docs/README.md](docs/README.md).
 
 ## O que é
 
@@ -22,7 +25,7 @@ O semeador também tem certificado da mesma associação. Só um semeador verifi
 - Node.js 20 ou mais novo (`engines.node` é `>=20`)
 - npm
 
-O protótipo roda no Node. Esta fase não usa o runtime Pear, não usa o runtime Bare e não tem interface gráfica. Não há etapa de compilação.
+O programa de terminal roda no Node e não tem etapa de compilação. O núcleo (`packages/core`) também roda no runtime Bare, dentro do aplicativo (`apps/app`; veja [docs/development.md](docs/development.md) para compilar o app). Esta fase não usa o runtime Pear.
 
 ## Instalação
 
@@ -323,6 +326,46 @@ No sucesso o processo sai com código 0 e imprime `DEMO OK`. Na primeira falha i
 npm run demo -- --keep
 ```
 
+## Servidor local para a interface web (varanda-serve)
+
+`node bin/varanda-serve.js` roda um nó Varanda (a sessão do núcleo) neste computador e o expõe a uma interface no navegador por um WebSocket local. As chaves ficam nesta máquina. É um programa separado: `node bin/varanda.js` não muda.
+
+```sh
+node bin/varanda-serve.js --data ./data --association <hex> \
+  --bootstrap 127.0.0.1:49737 --dht-host 127.0.0.1 --ui apps/app/dist
+```
+
+Imprime uma vez, depois de começar a escutar:
+
+```
+varanda-serve em http://127.0.0.1:<porta>
+abra http://127.0.0.1:<porta>/#token=<token>
+```
+
+Sem `--ui`, a segunda linha é `token: <token>`. O token só aparece nessa linha. Na URL ele vai depois do `#`, que o navegador não envia ao servidor.
+
+Opções (`--help` imprime a lista):
+
+- `--port <n>`: porta local, padrão 8787. `0` escolhe uma porta livre.
+- `--origin <url>`: origem permitida no WebSocket, repetível, escrita exatamente como o navegador a envia (`http://localhost:8081`, sem barra no fim).
+- `--ui <dir>`: diretório com a exportação web estática. Com ele, `http://127.0.0.1:<porta>` e `http://localhost:<porta>` também são origens permitidas.
+- `--public-dht`: usa a DHT pública. Aqui ela é opt-in: sem `--bootstrap` (ou `VARANDA_BOOTSTRAP`) e sem `--public-dht` o servidor recusa com `uso: informe --bootstrap ou --public-dht`. As duas juntas também são erro de uso.
+- `--data`, `--association`, `--bootstrap`, `--dht-host` e as variáveis `VARANDA_*` funcionam como no `varanda`. Sem `--association`, vale a associação do `config.json` de membro já existente.
+
+O token vem de `VARANDA_SERVE_TOKEN` (32 a 256 caracteres de `A-Z a-z 0-9 _ -`, senão `uso: VARANDA_SERVE_TOKEN inválido`) ou são 32 bytes aleatórios em 64 dígitos hexadecimais. Não existe opção `--token`: a linha de comando é visível a todo usuário local em `ps`.
+
+Recusas antes de escutar (código 2, `uso: <mensagem>`): diretório de semeador ou de associação (`uso: diretório não é de um membro`), chave ou bootstrap inválidos, nenhuma origem permitida (`uso: informe --origin ou --ui`), opção desconhecida. Porta ocupada: `erro: porta em uso`, código 1.
+
+Regras de segurança:
+
+- Escuta só em `127.0.0.1`. Não há opção de host.
+- Toda requisição HTTP e todo upgrade exigem `Host` igual a `127.0.0.1:<porta>` ou `localhost:<porta>` (defesa contra DNS rebinding), senão 421. Nunca há cabeçalhos CORS.
+- HTTP aceita só GET e HEAD (senão 405). Sem `--ui`, tudo fora de `/rpc` é 404. Com `--ui`, só arquivos dentro do diretório (pelo caminho real): `..`, barra invertida, NUL, arquivos com ponto no início e links simbólicos para fora dão 404; um caminho sem extensão que não é arquivo devolve `index.html`. Não há listagem de diretório. Toda resposta leva `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY` e `Cache-Control: no-store`.
+- O WebSocket fica em `/rpc` e exige `Origin` permitido (senão 403). No máximo 4 conexões abertas (a quinta recebe 503). Mensagens só de texto (binário fecha com 1003), até `MAX_REQUEST` bytes, no máximo 20 por segundo com rajada de 40 (acima disso fecha com 1008). `session.open` com o token tem de chegar em 5 s. Só uma conexão autenticada por vez: a nova fecha a anterior com o código 4000 (`substituída`). Um cliente que não lê e acumula mais de `MAX_OUTBOUND` bytes é desligado.
+- `VARANDA_SERVE_OPEN_TIMEOUT_MS` existe só para os testes: encurta o prazo do `session.open` (1 a 5000 ms), nunca o alonga.
+
+Ctrl-C (SIGINT) ou SIGTERM fecha as conexões (código 1001), espera a sessão terminar, libera o diretório de dados e sai com 0. Erros internos aparecem só em stderr como `erro interno: <mensagem>`, nunca para o cliente.
+
 ## Testes e lint
 
 ```sh
@@ -343,6 +386,7 @@ node apps/cli/test/feed.test.js
 node apps/cli/test/net.test.js
 node apps/cli/test/records.test.js
 node apps/cli/test/seeder.test.js
+node apps/cli/test/serve.test.js
 node apps/cli/test/smoke.test.js
 node apps/cli/test/store.test.js
 node apps/cli/test/sync.test.js

@@ -179,6 +179,21 @@ test('missing handler, bad results', async (t) => {
   for (const id of [a, b, c, d]) t.is(s.byId(id).error.code, 'INTERNAL')
 })
 
+test('node.close: answered only where a handler is registered (IPC worklet)', async (t) => {
+  const plain = setup({ handlers: {} })
+  plain.call('session.open')
+  const a = plain.call('node.close')
+  await flush()
+  t.alike(plain.byId(a).error, { code: 'INTERNAL', message: 'erro interno' }, 'no handler (varanda-serve) -> INTERNAL')
+  const ipc = setup({ handlers: { 'node.close': async () => ({ closed: true }) } })
+  ipc.call('session.open')
+  const b = ipc.call('node.close')
+  const c = ipc.call('node.close', { x: 1 })
+  await flush()
+  t.alike(ipc.byId(b).result, { closed: true })
+  t.is(ipc.byId(c).error.code, 'USAGE', 'params must be {}')
+})
+
 test('a result whose traps throw becomes INTERNAL', async (t) => {
   const hostile = new Proxy({}, { getPrototypeOf () { throw new Error('trap') } })
   const s = setup({ handlers: { 'node.info': async () => hostile } })
