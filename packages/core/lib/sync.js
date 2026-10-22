@@ -121,7 +121,10 @@ async function runSync ({
   messageBurst = MESSAGE_BURST,
   messageRate = MESSAGE_RATE,
   openHook = null,
-  inspectHook = null
+  inspectHook = null,
+  // Forwarded as is to openStore and openQuarantine (lib/store.js: lock
+  // mode, recover, suspend); undefined = their defaults.
+  storeOptions
 } = {}) {
   // The trust root is checked before anything touches the data dir.
   const config = readConfig(dataDir)
@@ -1060,7 +1063,7 @@ async function runSync ({
   }
 
   try {
-    store = await openStore(dataDir)
+    store = await openStore(dataDir, storeOptions)
     // R6.2: the main store holds the RocksDB lock before the quarantine is wiped.
     diary = await openDiary(store)
     ownHex = b4a.toString(diary.key, 'hex')
@@ -1070,7 +1073,7 @@ async function runSync ({
       : [])
     if (g && certForKey(g, ownHex, association).ok) cert = g
     else log('sem certificado válido no bloco 0: o diário não será anunciado')
-    qstore = await openQuarantine(dataDir)
+    qstore = await openQuarantine(dataDir, storeOptions)
     if (inspectHook) inspectHook({ claimCount, topicHasPeer, failedSocketCount, lastClosedPeer: () => lastClosedPeer }) // test-only
 
     // One deadline (item 7): the completion timer and the gate fetches share

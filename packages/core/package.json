@@ -14,17 +14,35 @@
     "./package.json": "./package.json"
   },
   "imports": {
-    "#fs": "./lib/node/fs.js",
-    "#path": "./lib/node/path.js",
-    "#process": "./lib/node/process.js"
+    "#fs": {
+      "bare": "./lib/bare/fs.js",
+      "default": "./lib/node/fs.js"
+    },
+    "#path": {
+      "bare": "./lib/bare/path.js",
+      "default": "./lib/node/path.js"
+    },
+    "#process": {
+      "bare": "./lib/bare/process.js",
+      "default": "./lib/node/process.js"
+    }
+  },
+  "scripts": {
+    "test": "node ../../scripts/run-tests.js"
   },
   "dependencies": {
     "b4a": "1.9.0",
+    "bare-fs": "4.8.4",
+    "bare-path": "3.1.2",
+    "bare-process": "4.5.1",
     "compact-encoding": "3.5.2",
     "corestore": "7.15.0",
     "hypercore": "11.39.0",
     "hypercore-crypto": "3.7.0",
     "hyperdht": "6.34.1",
     "hyperswarm": "4.17.2"
+  },
+  "devDependencies": {
+    "bare-runtime": "1.34.1"
   }
 }

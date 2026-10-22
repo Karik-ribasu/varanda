@@ -8,6 +8,7 @@ const Hypercore = require('hypercore')
 const HyperDHT = require('hyperdht')
 const Hyperswarm = require('hyperswarm')
 const { MAX_LOG_BLOCKS } = require('./records')
+const clock = require('./clock')
 
 const PROTOCOL = 'varanda/admission/1'
 const MAX_PAYLOAD = 16384
@@ -266,9 +267,9 @@ function validateMessage (msg) {
 // is the time until one token is available.
 function tokenBucket (burst, rate) {
   let tokens = burst
-  let last = performance.now()
+  let last = clock.now()
   function refill () {
-    const now = performance.now()
+    const now = clock.now()
     tokens = Math.min(burst, tokens + (now - last) * rate / 1000)
     last = now
   }

@@ -222,7 +222,15 @@ function takeOverLock (lockDir, stale, token) {
 // more than LOCK_GRACE_MS in the future: clock skew), else LOCKED after
 // LOCK_WAIT_MS. A lock path that is not a real directory is LOCK_INVALID at
 // once. Returns { lockDir, token } for this acquisition.
-async function acquireLock (dataDir) {
+//
+// lock 'worklet' (the app's Bare worklet, where pids mean nothing: every
+// worklet shares the app's pid) never probes a pid: an existing lock is
+// LOCKED, whether held by this process (heldLocks) or found on disk, unless
+// `recover` is true, which runs the same takeover as a stale posix lock. The
+// host passes recover only on a cold app start or after it terminated and
+// awaited the previous worklet; there is no same-pid heuristic. The lock
+// file content, heldLocks and the release are the same in both modes.
+async function acquireLock (dataDir, { lock, recover }) {
   const lockDir = path.join(dataDir, LOCK_DIR)
   const token = b4a.toString(randomBytes(16), 'hex')
   const waitUntil = Date.now() + LOCK_WAIT_MS
@@ -235,6 +243,14 @@ async function acquireLock (dataDir) {
       if (info === null) {
         // Removed between our mkdir and our lstat: yield, then retry.
         await sleep(10)
+        continue
+      }
+      if (lock === 'worklet') {
+        // Held by this process under any spelling of the path (relative,
+        // absolute, a symlink alias): the owner token on disk is one of ours.
+        const ours = heldLocks.has(lockDir) || (info.token !== null && [...heldLocks.values()].includes(info.token))
+        if (ours || !recover) throw lockedError()
+        if (!takeOverLock(lockDir, info, token)) await sleep(20)
         continue
       }
       if (info.pid !== null && pidAlive(info.pid)) throw lockedError()
@@ -259,7 +275,7 @@ async function acquireLock (dataDir) {
     heldLocks.set(lockDir, token)
     if (!exitHookArmed) {
       exitHookArmed = true
-      process.on('exit', releaseAllLocks)
+      if (typeof process.on === 'function') process.on('exit', releaseAllLocks)
     }
     return { lockDir, token }
   }
@@ -276,9 +292,17 @@ async function acquireLock (dataDir) {
 // Each openStore releases only its own acquisition (its token), at most
 // once: closing a store again after a later openStore took the lock never
 // touches that later lock.
-async function openStore (dataDir) {
+//
+// Options: `lock` is 'posix' (the default: pid probing and stale takeover,
+// see acquireLock) or 'worklet' (no pid probing; `recover` lets the host
+// take over a lock left by a previous worklet); anything else is refused
+// before the disk is touched. `suspend`, when given, is passed to Corestore
+// (corestore 7 suspends on Android only with `suspend: true`); when
+// undefined, Corestore is constructed as before.
+async function openStore (dataDir, { lock = 'posix', recover = false, suspend } = {}) {
+  if (lock !== 'posix' && lock !== 'worklet') throw new Error('lock inválido')
   privateDir(dataDir)
-  const { lockDir, token } = await acquireLock(dataDir)
+  const { lockDir, token } = await acquireLock(dataDir, { lock, recover })
   let released = false
   const release = () => {
     if (released) return
@@ -288,7 +312,7 @@ async function openStore (dataDir) {
   let store = null
   try {
     privateStoreDir(path.join(dataDir, 'store'))
-    store = new Corestore(path.join(dataDir, 'store'))
+    store = newCorestore(path.join(dataDir, 'store'), suspend)
     await store.ready()
   } catch (err) {
     let closed = true
@@ -334,11 +358,17 @@ async function openReplica (store, hex) {
   return core
 }
 
+// `suspend` undefined -> exactly the constructor call made before the
+// option existed.
+function newCorestore (dir, suspend) {
+  return suspend === undefined ? new Corestore(dir) : new Corestore(dir, { suspend })
+}
+
 // Quarantine store: block-0 fetches only, wiped at open, never state.
-async function openQuarantine (dataDir) {
+async function openQuarantine (dataDir, { suspend } = {}) {
   const dir = path.join(dataDir, 'quarantine')
   fs.rmSync(dir, { recursive: true, force: true })
-  const qstore = new Corestore(dir)
+  const qstore = newCorestore(dir, suspend)
   await qstore.ready()
   return qstore
 }

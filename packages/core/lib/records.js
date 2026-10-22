@@ -170,17 +170,53 @@ function formatRef ({ author, seq }) {
   return author + ':' + seq
 }
 
+// Fallback for a runtime without structuredClone (bare-runtime 1.34.1 has
+// it; the Bare embedded by react-native-bare-kit may differ): copies plain
+// data only (null, booleans, numbers, strings, arrays, plain objects) and
+// throws on anything else (functions, undefined, BigInt, symbols, class
+// instances, cycles), which the caller turns into null exactly as a
+// structuredClone DataCloneError or a validation failure would.
+function plainClone (value, seen) {
+  if (value === null) return null
+  const type = typeof value
+  if (type === 'boolean' || type === 'number' || type === 'string') return value
+  if (type !== 'object') throw new TypeError('not plain data')
+  if (seen.has(value)) throw new TypeError('cycle')
+  seen.add(value)
+  let copy
+  if (Array.isArray(value)) {
+    copy = []
+    for (let i = 0; i < value.length; i++) copy.push(plainClone(value[i], seen))
+  } else {
+    if (!isPlainObject(value)) throw new TypeError('not plain data')
+    copy = {}
+    // A data property, never an assignment: an own '__proto__' key must be
+    // copied as a key (as structuredClone does), not run the prototype setter.
+    for (const key of Object.keys(value)) {
+      Object.defineProperty(copy, key, { value: plainClone(value[key], seen), enumerable: true, writable: true, configurable: true })
+    }
+  }
+  seen.delete(value)
+  return copy
+}
+
+function cloneRecord (record) {
+  if (typeof structuredClone === 'function') return structuredClone(record)
+  return plainClone(record, new Set())
+}
+
 // Plain-data copy of a valid record, or null. The record is read once (by
-// structuredClone) and validated on the copy, so accessors cannot change a
-// field between validation and use, and callers never get references into
-// the caller's log entries. Never throws.
+// structuredClone, or by the plain-data walker above where the runtime has
+// none) and validated on the copy, so accessors cannot change a field
+// between validation and use, and callers never get references into the
+// caller's log entries. Never throws.
 function validRecordCopy (record, seq) {
   let copy
   try {
     // Inside the try: a revoked Proxy or a throwing getPrototypeOf trap is
     // skipped, never thrown.
     if (!isPlainObject(record)) return null
-    copy = structuredClone(record)
+    copy = cloneRecord(record)
   } catch {
     return null
   }

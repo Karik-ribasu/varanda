@@ -40,6 +40,7 @@ const {
 } = require('./store')
 const { validateRecord, decodeBlock, MAX_LOG_BLOCKS, MAX_LOG_BYTES } = require('./records')
 const { UsageError } = require('./errors')
+const clock = require('./clock')
 
 const GATE_TIMEOUT_MS = 15000
 const REDISCOVER_MS = 10000
@@ -355,7 +356,7 @@ class Seeder {
 
   // Token bucket per peer: announceBurst tokens, refilled at announceRate/s.
   _takeAnnounceToken (peer) {
-    const now = performance.now() // monotonic: a wall-clock step must not drain the bucket
+    const now = clock.now() // monotonic: a wall-clock step must not drain the bucket
     if (!peer.announceBucket) peer.announceBucket = { tokens: this.announceBurst, at: now }
     const b = peer.announceBucket
     b.tokens = Math.min(this.announceBurst, b.tokens + (now - b.at) * this.announceRate / 1000)
