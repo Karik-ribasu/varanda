@@ -3,7 +3,7 @@
 O site estático do Varanda (varanda.app). Pacote privado do monorepo, sem JavaScript na página, sem formulários, sem cookies e sem rastreadores.
 
 - `public/`: a raiz publicável. Só esta pasta vai para a GitHub Pages.
-- `artwork/`: as fontes do logotipo, `og.html` (a imagem de compartilhamento), `app-design.md` (o desenho novo do app, que a página mostra em prévia) e `screens.md` (a receita para capturar o app de verdade quando ele tiver esse desenho). Nunca são publicadas.
+- `artwork/`: as fontes do logotipo, `og.html` (a imagem de compartilhamento), `app-design.md` (o desenho do app) e `screens.md` (a receita das capturas do app que a página mostra). Nunca são publicadas.
 - `scripts/`: `serve.js` (servidor local) e `render-assets.js` (gera ícones, abertura e favicons a partir do logotipo).
 
 ```sh
@@ -16,7 +16,7 @@ Para regenerar os ícones: `node apps/site/scripts/render-assets.js` (precisa de
 
 ## Prévia do app
 
-As três telas da página (o herói e a seção "O app novo, em prévia") não são capturas: são HTML e CSS dentro da moldura do telefone, com conteúdo fictício, mostrando o desenho que o app vai ganhar. O desenho está em [artwork/app-design.md](artwork/app-design.md); as classes `.app`, `.post`, `.avatar`, `.folha` e `.perfil` em `public/styles.css` são a referência visual.
+As telas da página (o herói e a seção "O app por dentro") são capturas do app de verdade no simulador do iPhone, com conteúdo fictício: A Rua, Publicar e Diário, em `public/assets/screens/` (WebP de 603x1311, o herói repete A Rua). A receita, com os bytes e o sha256 de cada arquivo, está em [artwork/screens.md](artwork/screens.md); o teste do site confere os três arquivos e o limite de tamanho. O desenho do app está em [artwork/app-design.md](artwork/app-design.md).
 
 ## Imagem de compartilhamento
 
