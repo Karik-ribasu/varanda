@@ -1,0 +1,50 @@
+# Semeador Varanda com Docker Compose, num servidor Linux.
+#
+# Da raiz do repositório, depois da configuração inicial (README, seção
+# "Operar o semeador"):
+#   docker compose -f deploy/seeder/compose.yaml up -d --build
+#   docker compose -f deploy/seeder/compose.yaml ps
+#   curl -s http://127.0.0.1:8788/health
+name: varanda-seeder
+
+services:
+  seeder:
+    build:
+      context: ../..
+      dockerfile: deploy/seeder/Dockerfile
+    image: varanda-seeder:local
+    command: ["seed", "--json"]
+    # Rede do host: o semeador usa o endereço da máquina, sem o NAT do Docker
+    # entre ele e os membros (que muitas vezes estão atrás de CGNAT). O
+    # endpoint de saúde continua só em 127.0.0.1 do host.
+    network_mode: host
+    # SIGTERM fecha o semeador (store, quarentena e lock) e ele sai com 0;
+    # qualquer outra saída é reiniciada.
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    environment:
+      VARANDA_HEALTH_PORT: "8788"
+      VARANDA_HEALTH_HOST: 127.0.0.1
+      # Só para uma DHT privada. Sem esta linha o semeador usa a DHT pública;
+      # um valor vazio é erro de uso.
+      # VARANDA_BOOTSTRAP: "host:porta,host:porta"
+    volumes:
+      - seeder-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Rotação por tamanho: até 5 arquivos de 10 MB (política de registros no
+    # README; retenção provisória, pendente do parecer da issue #38).
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+volumes:
+  seeder-data:

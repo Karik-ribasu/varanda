@@ -2,7 +2,10 @@
 
 const { Seeder } = require('@varanda/core/lib/seeder')
 const { UsageError } = require('../cli')
+const { startHealth, DEFAULT_HOST } = require('../health')
 const { safe, jsonLine } = require('@varanda/core/lib/safe')
+
+const USAGE = 'node bin/varanda.js seed [key|cert add|list|drop <chave>|status]'
 
 function print (flags, result, line) {
   process.stdout.write((flags.json ? jsonLine(result) : line) + '\n')
@@ -12,15 +15,29 @@ function short (hex) {
   return safe(String(hex).slice(0, 8))
 }
 
+function url (host, port) {
+  return 'http://' + (host.includes(':') ? '[' + host + ']' : host) + ':' + port
+}
+
 function eventLine (event) {
   switch (event.event) {
     case 'ready': return 'seed ready'
+    case 'health': return 'health ' + safe(url(event.host, event.port))
     case 'peer': return 'peer ' + safe(event.role) + ' ' + short(event.peerKey)
     case 'admitted': return 'admitted ' + safe(event.key) + ' ' + safe(event.length)
     case 'rejected': return 'rejected ' + safe(event.key) + ' ' + safe(event.reason)
     case 'have': return 'have ' + safe(event.key) + ' ' + safe(event.length)
     case 'fatal': return 'fatal ' + safe(event.key) + ' ' + safe(event.reason)
     default: return safe(event.event)
+  }
+}
+
+async function listenHealth (flags, seeder) {
+  try {
+    return await startHealth({ host: flags.healthHost || DEFAULT_HOST, port: flags.healthPort, stats: () => seeder.stats() })
+  } catch (err) {
+    if (err.code === 'EADDRINUSE') throw new Error('porta em uso')
+    throw new Error('não foi possível abrir o endpoint de saúde (' + safe(err.code || err.message) + ')')
   }
 }
 
@@ -43,11 +60,19 @@ async function runSeeder (flags) {
     process.once('SIGINT', onSignal)
     process.once('SIGTERM', onSignal)
   })
+  // The health endpoint listens before start(), so a busy port fails before
+  // the data dir or the network is touched; it answers 503 until ready.
+  let health = null
   try {
+    if (flags.healthPort !== null) {
+      health = await listenHealth(flags, seeder)
+      log({ event: 'health', host: health.host, port: health.port })
+    }
     await seeder.start()
   } catch (err) {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
+    if (health) await health.close()
     throw err
   }
   try {
@@ -57,8 +82,35 @@ async function runSeeder (flags) {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
     await seeder.close()
+    if (health) await health.close()
   }
   return seeder.fatal ? 1 : 0
+}
+
+function certificateLine (certificate) {
+  if (certificate === 'ok') return 'certificado: válido'
+  if (certificate === 'missing') return 'certificado: ausente (use seed cert add)'
+  return 'certificado: inválido (' + safe(certificate) + ')'
+}
+
+function statusLines (status) {
+  return [
+    'associação: ' + status.association,
+    'chave do semeador: ' + (status.publicKey === null ? 'ausente (use seed key)' : status.publicKey),
+    certificateLine(status.certificate),
+    'diários admitidos: ' + status.admitted,
+    'estado: ' + (status.running ? 'em execução' : 'parado')
+  ].join('\n')
+}
+
+function listLines ({ admitted }) {
+  if (admitted.length === 0) return 'nenhum diário admitido'
+  return admitted.map((e) => e.key + ' ' + e.length + ' blocos ' + e.byteLength + ' bytes').join('\n')
+}
+
+function diaryKey (value) {
+  if (!/^[0-9a-fA-F]{64}$/.test(value)) throw new UsageError('chave inválida')
+  return value.toLowerCase()
 }
 
 async function run (flags) {
@@ -80,7 +132,26 @@ async function run (flags) {
     return 0
   }
 
-  throw new UsageError('node bin/varanda.js seed [key|cert add]')
+  if (sub === 'status' && subsub === undefined) {
+    const status = Seeder.status(flags.dataDir, flags.association)
+    print(flags, status, statusLines(status))
+    return 0
+  }
+
+  if (sub === 'list' && subsub === undefined) {
+    const result = await Seeder.list(flags.dataDir, flags.association)
+    print(flags, result, listLines(result))
+    return 0
+  }
+
+  if (sub === 'drop' && flags.positionals.length <= 2) {
+    if (subsub === undefined) throw new UsageError('informe a chave do diário')
+    const result = await Seeder.drop(flags.dataDir, flags.association, diaryKey(subsub))
+    print(flags, result, 'diário removido do semeador: ' + result.key)
+    return 0
+  }
+
+  throw new UsageError(USAGE)
 }
 
 module.exports = {

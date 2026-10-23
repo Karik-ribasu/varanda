@@ -1,0 +1,12 @@
+# Build context of the seeder image (deploy/seeder/Dockerfile): only what the
+# CLI needs at run time.
+*
+!package.json
+!package-lock.json
+!packages/core
+!packages/rpc
+!apps/cli
+**/node_modules
+**/test
+apps/cli/data
+apps/cli/demo-data

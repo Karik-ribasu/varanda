@@ -11,6 +11,7 @@ Protótipo de fase 0 de uma rede social ponto a ponto no Holepunch (Hypercore, H
 - `apps/site`: o site estático do Varanda (página de apresentação, logotipo e as fontes dos ícones do app). [README](apps/site/README.md), [docs/site.md](docs/site.md).
 - `packages/core`: o núcleo do protocolo e a sessão do nó, usados pelo CLI e pelo app (Node e Bare). [README](packages/core/README.md).
 - `packages/rpc`: o contrato JSON entre a interface e o nó. [README](packages/rpc/README.md).
+- `deploy/seeder`: imagem Docker, Compose e unidade systemd do semeador. Ver [Operar o semeador](#operar-o-semeador).
 - `docs/`: `protocol.md` (referência normativa dos formatos), `rpc.md` (contrato da interface), `design.md` (documento de design), `development.md`, `app.md` e `ios-gate.md`. O índice está em [docs/README.md](docs/README.md).
 
 ## O que é
@@ -65,8 +66,10 @@ Comandos:
   log                        mostra os blocos locais de um diário
   feed                       feed com as publicações dos diários seguidos
   sync                       sincroniza com pares e com o semeador (--once, --timeout-ms)
-  seed                       semeador sempre ligado
+  seed                       semeador sempre ligado (--health-port)
   seed key|cert add          chave do semeador e seu certificado (--cert-file)
+  seed list|status           diários admitidos e estado do semeador
+  seed drop <chave>          apaga um diário do semeador parado
   help                       esta ajuda
 Opções globais:
   --data <dir>               diretório de dados (ou VARANDA_DATA, padrão ./data)
@@ -76,7 +79,7 @@ Opções globais:
   --json                     saída JSON na última linha
 Opções dos comandos:
   --member --seeder --age-band --method --out --cert-file --name --bio --text
-  --to --author --limit --once --timeout-ms
+  --to --author --limit --once --timeout-ms --health-port --health-host
 ```
 
 `--json` coloca um objeto JSON na última linha da saída padrão. Em `sync` e `seed`, cada evento é uma linha JSON e o resultado fecha a saída. Nenhum comando imprime chave secreta. `seed key` imprime só a chave pública Noise do semeador.
@@ -136,6 +139,8 @@ Num comando seguinte, `--association` e `VARANDA_ASSOCIATION` são opcionais. Se
 | `VARANDA_ASSOCIATION` | Chave pública da associação (64 hex, qualquer caixa; gravada em minúsculas). |
 | `VARANDA_BOOTSTRAP` | Nós `host:porta` separados por vírgula. Ausente, e sem `--bootstrap`, os comandos usam a DHT pública. |
 | `VARANDA_DHT_HOST` | Endereço local em que a DHT deste processo escuta. O mesmo que `--dht-host`. |
+| `VARANDA_HEALTH_PORT` | Porta do endpoint de saúde do `seed`. O mesmo que `--health-port`. Ausente, não há endpoint. |
+| `VARANDA_HEALTH_HOST` | Endereço do endpoint de saúde. O mesmo que `--health-host`. Padrão `127.0.0.1`. |
 
 `--bootstrap` pode repetir. Se algum `--bootstrap` aparece na linha, ele prevalece sobre `VARANDA_BOOTSTRAP`. `--dht-host` prevalece sobre `VARANDA_DHT_HOST`.
 
@@ -143,11 +148,13 @@ Um `VARANDA_BOOTSTRAP` vazio ou malformado é erro de uso e não cai na DHT púb
 
 `VARANDA_DHT_HOST` e `--dht-host` aceitam uma string não vazia e sem espaço. Qualquer outro valor termina com `uso: dht-host inválido`.
 
+`VARANDA_HEALTH_PORT` e `--health-port` aceitam um número de 0 a 65535, sem zero à esquerda (`0` deixa o sistema escolher a porta); senão `uso: health-port inválido`. `VARANDA_HEALTH_HOST` e `--health-host` seguem a regra do `--dht-host` (`uso: health-host inválido`). A opção prevalece sobre a variável. Detalhes em "Operar o semeador".
+
 A DHT local de `apps/cli/scripts/local-dht.js` escuta só em `127.0.0.1`. Com ela, defina `VARANDA_DHT_HOST=127.0.0.1` ou passe `--dht-host 127.0.0.1`. Testes e `npm run demo` usam esse endereço. Sem bootstrap (DHT pública, uso manual), o endereço local é opcional e a DHT fica nos padrões da biblioteca.
 
 ### Um processo por diretório de dados
 
-`store/` é um Corestore em RocksDB e segura um lock do sistema. Antes de abri-lo, o `varanda` também cria o lock `<dir>/.varanda-lock` (com o pid do processo). Um segundo processo no mesmo `--data` falha com `erro: diretório de dados em uso` enquanto o primeiro não fecha o store; um lock deixado por um processo que morreu é retomado sozinho. Um lock sem pid legível só é retomado quando o diretório do lock tem mais de 10 segundos. Se `.varanda-lock` não for um diretório (um arquivo ou um link simbólico), a abertura falha na hora com `erro: lock inválido (não é um diretório): <caminho>`; um link simbólico em `<dir>/store` também é recusado. Se o pid de um processo morto foi reaproveitado por outro processo seu, o lock continua em uso: confira que nenhum processo `varanda` usa o diretório e apague `<dir>/.varanda-lock` à mão. Comandos curtos abrem e fecham. `sync` e `seed` seguram o diretório o tempo todo em que estão rodando.
+`store/` é um Corestore em RocksDB e segura um lock do sistema. Antes de abri-lo, o `varanda` também cria o lock `<dir>/.varanda-lock` (com o pid do processo). Um segundo processo no mesmo `--data` falha com `erro: diretório de dados em uso` enquanto o primeiro não fecha o store; um lock deixado por um processo que morreu é retomado sozinho. Um lock com o pid do próprio processo que ele não pegou também é retomado: é o caso de um contêiner reiniciado, em que o semeador é sempre o pid 1. Um lock sem pid legível só é retomado quando o diretório do lock tem mais de 10 segundos. Se `.varanda-lock` não for um diretório (um arquivo ou um link simbólico), a abertura falha na hora com `erro: lock inválido (não é um diretório): <caminho>`; um link simbólico em `<dir>/store` também é recusado. Se o pid de um processo morto foi reaproveitado por outro processo seu, o lock continua em uso: confira que nenhum processo `varanda` usa o diretório e apague `<dir>/.varanda-lock` à mão. Comandos curtos abrem e fecham. `sync` e `seed` seguram o diretório o tempo todo em que estão rodando. `seed status` nunca pega o lock.
 
 O store principal abre antes de `quarantine/` ser apagado. O segundo processo esbarra no lock e não apaga a quarentena de um `sync` ou `seed` que já está de pé.
 
@@ -327,6 +334,118 @@ No sucesso o processo sai com código 0 e imprime `DEMO OK`. Na primeira falha i
 npm run demo -- --keep
 ```
 
+## Operar o semeador
+
+Para quem mantém um semeador ligado: comandos de operação, saúde e métricas, serviço supervisionado (Docker Compose ou systemd) e a política de registros. Os arquivos de implantação ficam em `deploy/seeder/`.
+
+### Comandos de operação
+
+`seed status` mostra a associação, a chave pública do semeador, o estado do certificado, quantos diários estão em `admitted.json` e se algum processo segura o diretório. Não pega o lock, não abre o store e não grava nada: funciona com o semeador ligado ou parado, e sai com 0.
+
+```
+associação: <64 hex>
+chave do semeador: <64 hex>
+certificado: válido
+diários admitidos: 2
+estado: em execução
+```
+
+Sem `seeder-key.json` a segunda linha é `chave do semeador: ausente (use seed key)`. Sem certificado: `certificado: ausente (use seed cert add)`; certificado que não confere: `certificado: inválido (<motivo>)`. O estado é `em execução` ou `parado`. Num diretório que não é de semeador: `erro: diretório não é de um semeador`. Com `--json`: `{ "association", "publicKey", "certificate", "admitted", "running" }`, com `certificate` igual a `ok`, `missing` ou o motivo.
+
+`seed list` mostra os diários admitidos, um por linha, na ordem de `admitted.json`: `<chave> <blocos> blocos <bytes> bytes`. O tamanho é o assinado, o mesmo que a cota confere. Sem diários: `nenhum diário admitido`. Com `--json`: `{ "admitted": [{ "key", "length", "byteLength" }] }`. Uma chave listada sem cópia guardada aparece com 0 e 0.
+
+`seed drop <chave>` apaga a cópia de um diário e só depois tira a chave de `admitted.json`, a mesma ordem do descarte na partida. Imprime `diário removido do semeador: <chave>`. Chave que não está no semeador: `erro: diário não está no semeador` (código 1). Sem chave: `uso: informe a chave do diário`; chave malformada: `uso: chave inválida` (código 2).
+
+`seed list` e `seed drop` abrem o store e pegam o lock do diretório. Só funcionam com o semeador parado; com ele no ar saem com `erro: diretório de dados em uso` (código 1) e não mexem em nada. Pare o serviço, rode o comando e suba de novo.
+
+`seed drop` não é bloqueio. No próximo `sync` da autora o semeador confere o bloco 0 e admite o diário outra vez. Manter um diário fora depende das listas de moderação, previstas para a fase 2.
+
+### Saúde e métricas
+
+`seed --health-port <porta>` (ou `VARANDA_HEALTH_PORT`) abre um endpoint HTTP só de leitura em `127.0.0.1`. Outro endereço só com `--health-host` (ou `VARANDA_HEALTH_HOST`); `0.0.0.0` expõe o endpoint para fora da máquina. Sem a porta, nada escuta. A porta `0` escolhe uma livre, e a primeira linha da saída diz qual: `health http://127.0.0.1:<porta>`. Porta ocupada termina com `erro: porta em uso` (código 1) antes de abrir o diretório.
+
+- `GET /health` devolve `{ "status", "uptimeSeconds", "admitted", "dropping", "blocks", "bytes", "connections", "peers", "firewalled" }`. Código 200 com `status` igual a `ok`; 503 com `starting` (antes de `seed ready`) ou `closing` (encerrando).
+- `GET /metrics` devolve as mesmas contagens no formato de texto do Prometheus: `varanda_seeder_ready`, `varanda_seeder_admitted_diaries`, `varanda_seeder_dropping_diaries`, `varanda_seeder_blocks`, `varanda_seeder_bytes`, `varanda_seeder_connections`, `varanda_seeder_peers`, `varanda_seeder_firewalled` e `varanda_seeder_uptime_seconds`.
+
+```sh
+curl -s http://127.0.0.1:8788/health
+```
+
+```json
+{"status":"ok","uptimeSeconds":42,"admitted":2,"dropping":0,"blocks":6,"bytes":1418,"connections":3,"peers":3,"firewalled":false}
+```
+
+`admitted` são os diários servidos e `dropping` os que estão sendo apagados; `blocks` e `bytes` somam os diários servidos; `connections` são as conexões abertas e `peers` as que já abriram o canal de admissão. `firewalled: true` quer dizer que a DHT se vê atrás de firewall ou NAT: os membros só chegam ao semeador por hole punching.
+
+O endpoint só tem contagens. Nenhuma chave, certificado, endereço ou conteúdo, e nenhuma requisição é registrada. Aceita só GET e HEAD (senão 405) em `/health` e `/metrics` (senão 404), sem cabeçalhos CORS.
+
+### Docker Compose
+
+`deploy/seeder/compose.yaml` sobe a imagem de `deploy/seeder/Dockerfile`: Node 24, só as dependências de produção da CLI, usuário `node`, sistema de arquivos só de leitura e os dados no volume `seeder-data` (em `/data`). O serviço usa a rede do host, reinicia sozinho (`unless-stopped`), recebe SIGTERM com 30 s para fechar e deixa o endpoint de saúde em `127.0.0.1:8788`, onde o healthcheck da imagem o consulta. É para um servidor Linux: no Docker Desktop a rede do host não funciona do mesmo jeito.
+
+Configuração, uma vez, a partir da raiz do repositório (`ASSOC` é a chave pública da associação):
+
+```sh
+docker compose -f deploy/seeder/compose.yaml build
+docker compose -f deploy/seeder/compose.yaml run --rm seeder seed key --association "$ASSOC"
+```
+
+A associação certifica a chave impressa, na máquina dela (`assoc certify-seeder --seeder <chave> --out seeder-cert.json`). Com o arquivo no diretório atual:
+
+```sh
+docker compose -f deploy/seeder/compose.yaml run --rm -v "$PWD/seeder-cert.json:/cert/seeder-cert.json:ro" seeder seed cert add --cert-file /cert/seeder-cert.json
+```
+
+Daí em diante, um comando sobe o semeador e outro mostra a saúde:
+
+```sh
+docker compose -f deploy/seeder/compose.yaml up -d
+curl -s http://127.0.0.1:8788/health
+```
+
+`docker compose -f deploy/seeder/compose.yaml ps` mostra `(healthy)` depois de `seed ready`. Registros: `docker compose -f deploy/seeder/compose.yaml logs -f seeder`. Estado sem parar: `docker compose -f deploy/seeder/compose.yaml exec seeder node apps/cli/bin/varanda.js seed status`. Para `seed list` ou `seed drop`, pare antes (`stop`), rode com `run --rm seeder seed list` e suba de novo (`start`). Não use `run` com o serviço no ar: cada contêiner tem os próprios pids, e o lock do diretório não enxerga o processo do outro.
+
+### systemd
+
+`deploy/seeder/varanda-seeder.service` roda `seed --json` como o usuário de sistema `varanda`, com os dados em `/var/lib/varanda/seeder` e o endpoint de saúde em `127.0.0.1:8788`. Reinicia 5 s depois de uma falha (código 1), mas não depois de um erro de uso (código 2, configuração errada). Para com SIGTERM e espera até 30 s. Instalação, como root (Node 20 ou mais novo em `/usr/bin/node`; ajuste o `ExecStart` se não for o caso):
+
+```sh
+useradd --system --home-dir /var/lib/varanda --shell /usr/sbin/nologin varanda
+git clone https://github.com/Varanda-org/varanda.git /opt/varanda
+cd /opt/varanda && npm ci --omit=dev --workspace apps/cli --ignore-scripts
+install -d -o varanda -g varanda -m 0700 /var/lib/varanda
+install -m 0644 deploy/seeder/varanda-seeder.service /etc/systemd/system/
+install -D -m 0600 deploy/seeder/seeder.env.example /etc/varanda/seeder.env
+```
+
+Chave e certificado, como o usuário `varanda` (o arquivo do certificado precisa ser legível por ele):
+
+```sh
+sudo -u varanda env VARANDA_DATA=/var/lib/varanda/seeder node /opt/varanda/bin/varanda.js seed key --association "$ASSOC"
+sudo -u varanda env VARANDA_DATA=/var/lib/varanda/seeder node /opt/varanda/bin/varanda.js seed cert add --cert-file /caminho/seeder-cert.json
+```
+
+Subir e ver a saúde:
+
+```sh
+systemctl daemon-reload
+systemctl enable --now varanda-seeder
+curl -s http://127.0.0.1:8788/health
+```
+
+Registros: `journalctl -u varanda-seeder -f`. `seed list` e `seed drop`: `systemctl stop varanda-seeder`, o comando como o usuário `varanda` (como acima), `systemctl start varanda-seeder`.
+
+### Política de registros
+
+Provisória até o parecer jurídico sobre registros de acesso (issue #38).
+
+- **Formato.** Uma linha por evento na saída padrão. No serviço, `--json`: JSON Lines com os eventos `health`, `ready`, `peer`, `admitted`, `rejected`, `have`, `peer-dropped`, `warning` e `fatal` (o mais frequente é `have`, a cada crescimento de um diário). Erros vão para a saída de erro como `erro: <mensagem>`. A linha não traz data e hora: o journal e o Docker carimbam cada uma.
+- **O que entra.** Chaves públicas de diários (64 hex), com tamanho ou motivo de recusa; a chave Noise dos pares (`peer`, `peer-dropped`); o tópico da associação (`ready`). São pseudônimos, e contam como dado pessoal quando alguém consegue ligá-los a uma pessoa.
+- **O que nunca entra.** Endereço IP ou porta de par, conteúdo de publicação ou de perfil, certificados, chaves secretas e as requisições ao endpoint de saúde.
+- **Rotação.** Pelo supervisor. Docker: driver `json-file` com até 5 arquivos de 10 MB (`compose.yaml`). systemd: o journal rotaciona sozinho.
+- **Retenção provisória: 30 dias.** No systemd, `deploy/seeder/journald-varanda.conf` vai para `/etc/systemd/journald.conf.d/varanda.conf` (`MaxRetentionSec=30day`). Vale para o journal inteiro da máquina, então use numa máquina dedicada. No Docker o limite é de volume (50 MB), não de tempo; para limitar por tempo, troque o driver para `journald` no `compose.yaml` e use a mesma configuração.
+- **Registros de acesso (Marco Civil, Art. 15).** O semeador não registra endereço IP, então hoje não guarda registro de acesso. Se o parecer concluir que o Art. 15 se aplica à associação, a guarda por 6 meses vai exigir registrar endereço e horário das conexões (mudança de código, ainda não feita) e ajustar a retenção acima. A retenção é configuração do supervisor (`MaxRetentionSec`, `max-size` e `max-file`), não do código: muda sem nova versão.
+
 ## Servidor local para a interface web (varanda-serve)
 
 `node bin/varanda-serve.js` roda um nó Varanda (a sessão do núcleo) neste computador e o expõe a uma interface no navegador por um WebSocket local. As chaves ficam nesta máquina. É um programa separado: `node bin/varanda.js` não muda.
@@ -386,6 +505,7 @@ node apps/cli/test/e2e.test.js
 node apps/cli/test/feed.test.js
 node apps/cli/test/net.test.js
 node apps/cli/test/records.test.js
+node apps/cli/test/seed-ops.test.js
 node apps/cli/test/seeder.test.js
 node apps/cli/test/serve.test.js
 node apps/cli/test/smoke.test.js
@@ -522,5 +642,5 @@ Fora desta fase:
 | Código | Quando |
 | --- | --- |
 | 0 | Sucesso. `sync --once` imprime `sync done` (ou `sync done (sem confirmação de semeador)` quando nenhum semeador verificado confirmou a cópia do seu diário). `seed` e a DHT local saem com 0 depois de SIGINT ou SIGTERM. A demo imprime `DEMO OK`. |
-| 1 | Falha. Mensagem em stderr: `erro: <mensagem>`. Exemplos: `erro: certificado inválido (untrusted-association)`, `erro: certificado do semeador não encontrado (use seed cert add)`, `erro: associação diferente da configurada`. `sync` com metas não cumpridas também sai 1 e escreve `sync failed: <erros>` na saída padrão. |
-| 2 | Uso. O analisador escreve `uso: <mensagem>` e em seguida a ajuda. Exemplos: `uso: bootstrap inválido <valor>`, `uso: bootstrap inválido (vazio)`, `uso: dht-host inválido`, `uso: falta o valor de --text`, `uso: opção desconhecida <flag>`. Um comando que recusa a própria linha escreve só `uso: <mensagem>`, sem repetir a ajuda: `uso: informe --text <texto>`, `uso: informe --seeder <hex>`, `uso: informe --cert-file <arquivo>`, `uso: node bin/varanda.js seed [key|cert add]`. Comando desconhecido sai 2 com `erro: comando desconhecido: <nome>`. |
+| 1 | Falha. Mensagem em stderr: `erro: <mensagem>`. Exemplos: `erro: certificado inválido (untrusted-association)`, `erro: certificado do semeador não encontrado (use seed cert add)`, `erro: associação diferente da configurada`, `erro: diretório de dados em uso`, `erro: porta em uso`. `sync` com metas não cumpridas também sai 1 e escreve `sync failed: <erros>` na saída padrão. |
+| 2 | Uso. O analisador escreve `uso: <mensagem>` e em seguida a ajuda. Exemplos: `uso: bootstrap inválido <valor>`, `uso: bootstrap inválido (vazio)`, `uso: dht-host inválido`, `uso: falta o valor de --text`, `uso: opção desconhecida <flag>`. Um comando que recusa a própria linha escreve só `uso: <mensagem>`, sem repetir a ajuda: `uso: informe --text <texto>`, `uso: informe --seeder <hex>`, `uso: informe --cert-file <arquivo>`, `uso: informe a chave do diário`, `uso: node bin/varanda.js seed [key|cert add|list|drop <chave>|status]`. Comando desconhecido sai 2 com `erro: comando desconhecido: <nome>`. |

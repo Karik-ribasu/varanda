@@ -16,8 +16,10 @@ Comandos:
   log                        mostra os blocos locais de um diário
   feed                       feed com as publicações dos diários seguidos
   sync                       sincroniza com pares e com o semeador (--once, --timeout-ms)
-  seed                       semeador sempre ligado
+  seed                       semeador sempre ligado (--health-port)
   seed key|cert add          chave do semeador e seu certificado (--cert-file)
+  seed list|status           diários admitidos e estado do semeador
+  seed drop <chave>          apaga um diário do semeador parado
   help                       esta ajuda
 Opções globais:
   --data <dir>               diretório de dados (ou VARANDA_DATA, padrão ./data)
@@ -27,13 +29,14 @@ Opções globais:
   --json                     saída JSON na última linha
 Opções dos comandos:
   --member --seeder --age-band --method --out --cert-file --name --bio --text
-  --to --author --limit --once --timeout-ms`
+  --to --author --limit --once --timeout-ms --health-port --health-host`
 
 const booleanFlags = new Set(['--json', '--once', '--help', '-h'])
 const stringFlags = new Set([
   '--data', '--association', '--timeout-ms', '--member', '--seeder',
   '--age-band', '--method', '--out', '--cert-file', '--name', '--bio',
-  '--text', '--to', '--author', '--limit', '--bootstrap', '--dht-host'
+  '--text', '--to', '--author', '--limit', '--bootstrap', '--dht-host',
+  '--health-port', '--health-host'
 ])
 
 function key (value, message = 'chave inválida') {
@@ -49,6 +52,13 @@ function integer (value, name) {
     throw new UsageError(name + ' inválido')
   }
   return number
+}
+
+// A TCP port, 0 (the system picks a free one) to 65535, canonical decimal.
+function port (value, name) {
+  if (value == null) return null
+  if (!/^(0|[1-9][0-9]{0,4})$/.test(value) || Number(value) > 65535) throw new UsageError(name + ' inválido')
+  return Number(value)
 }
 
 function bootstrapList (rawValues) {
@@ -111,6 +121,9 @@ function parseArgs (argv, env = process.env, cwd = process.cwd()) {
   const dhtHost = get('dht-host') ?? env.VARANDA_DHT_HOST ?? null
   if (dhtHost !== null && (!dhtHost || /\s/.test(dhtHost))) throw new UsageError('dht-host inválido')
 
+  const healthHost = get('health-host') ?? env.VARANDA_HEALTH_HOST ?? null
+  if (healthHost !== null && (!healthHost || /\s/.test(healthHost))) throw new UsageError('health-host inválido')
+
   return {
     command: positionals.shift() ?? null,
     positionals,
@@ -124,6 +137,8 @@ function parseArgs (argv, env = process.env, cwd = process.cwd()) {
     member: key(get('member')),
     seeder: key(get('seeder')),
     dhtHost,
+    healthPort: port(get('health-port') ?? env.VARANDA_HEALTH_PORT ?? null, 'health-port'),
+    healthHost,
     ageBand: get('age-band'),
     method: get('method'),
     out: get('out') === null ? null : path.resolve(cwd, get('out')),
