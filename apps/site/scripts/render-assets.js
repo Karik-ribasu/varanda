@@ -37,6 +37,7 @@ function targets () {
     { out: APP + '/assets/icon.png', src: 'icon-ios.svg', size: 1024, opaque: true },
     { out: APP + '/assets/splash-icon.png', src: 'splash.svg', size: 1024 },
     { out: APP + '/assets/favicon.png', src: 'mark.svg', size: 48 },
+    { out: APP + '/assets/cadeira.png', src: 'chair.svg', size: 128 },
     { out: APP + '/assets/android-icon-foreground.png', src: 'icon-android-foreground.svg', size: 512 },
     { out: APP + '/assets/android-icon-background.png', src: 'icon-android-background.svg', size: 512 },
     { out: APP + '/assets/android-icon-monochrome.png', src: 'icon-android-monochrome.svg', size: 432 },

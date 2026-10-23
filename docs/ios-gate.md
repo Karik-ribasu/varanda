@@ -64,7 +64,6 @@ Run them from the repo root unless a step says otherwise.
 ```sh
 npm ci                                            # or npm install (the orchestrator owns the lockfile)
 cd apps/app
-npx expo prebuild --no-install                    # only when ios/ or android/ must be regenerated (both are committed)
 npm run link:addons                               # bare-link into react-native-bare-kit's addon dirs; re-run after every install
 npm run pack:worklet                              # bare-pack + node: scan
 (cd ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install)   # picks up the linked xcframeworks

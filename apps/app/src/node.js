@@ -1,6 +1,8 @@
 // The node connection of the app: starts or connects, keeps the phase, the
 // sync state (fed by the node's events, so no event is lost while another tab
-// is shown) and hands the screens one `request` function.
+// is shown; `sync.stopped` carries the local time `at` it arrived, and
+// `sync.starting` is true while a sync.start request is in flight) and hands
+// the screens one `request` function.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { displayText } from '@varanda/rpc'
@@ -49,12 +51,16 @@ export function NodeProvider ({ children }) {
   const connRef = useRef(null)
   const startedRef = useRef(false)
   const busyRef = useRef(false)
+  // sync.start requests in flight: a lookup sent before the sync.started event
+  // would preempt a once-run and end it for good (docs/rpc.md 6.1).
+  const startingRef = useRef(0)
+  const [starting, setStarting] = useState(false)
 
   const onEvent = useCallback((name, data) => {
     setSync((prev) => {
       if (name === 'sync.started') return { ...prev, active: { runId: data.runId, once: data.once }, stopped: null }
       if (name === 'sync.stopped') {
-        const stopped = { runId: data.runId, reason: data.reason, result: data.result }
+        const stopped = { runId: data.runId, reason: data.reason, result: data.result, at: Date.now() }
         // Keyed by runId: a stop of a run that is no longer the active one
         // does not clear the state of the newer run.
         const active = prev.active && prev.active.runId === data.runId ? null : prev.active
@@ -140,12 +146,22 @@ export function NodeProvider ({ children }) {
 
   const request = useCallback((method, params) => {
     const conn = connRef.current
-    return conn ? conn.request(method, params) : noConnection()
+    if (!conn) return noConnection()
+    if (method !== 'sync.start') return conn.request(method, params)
+    startingRef.current += 1
+    setStarting(true)
+    const settled = () => {
+      startingRef.current -= 1
+      if (startingRef.current === 0) setStarting(false)
+    }
+    const pending = conn.request(method, params)
+    pending.then(settled, settled)
+    return pending
   }, [])
 
   const value = useMemo(() => ({
-    phase, config, error, sync, epoch, request, restart, reconnect, connect, canConfigure
-  }), [phase, config, error, sync, epoch, request, restart, reconnect, connect])
+    phase, config, error, sync: { ...sync, starting }, epoch, request, restart, reconnect, connect, canConfigure
+  }), [phase, config, error, sync, starting, epoch, request, restart, reconnect, connect])
 
   return <NodeContext.Provider value={value}>{children}</NodeContext.Provider>
 }

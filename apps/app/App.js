@@ -1,94 +1,225 @@
-import { useEffect, useState } from 'react'
+// The app shell: the first connection, the setup step (identity and member
+// certificate) and then three tabs (A Rua, Seguindo, Diário) with the top
+// bar and its sync chip, the publish button and the sheets (Publicar,
+// Ajustes). Design: apps/site/artwork/app-design.md.
+
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { StatusBar } from 'expo-status-bar'
-import { StyleSheet, Text, View } from 'react-native'
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NodeProvider, useNode } from './src/node'
-import { Btn, Tabs, colors } from './src/ui'
+import { NamesProvider, useNames } from './src/names'
+import { Btn, ErrorText, Soft, colors, errorText } from './src/ui'
+import { Fab } from './src/ui/Fab'
+import { loadIcons } from './src/ui/Icon'
+import { SyncChip } from './src/ui/SyncChip'
+import { TabBar } from './src/ui/TabBar'
+import { TopBar } from './src/ui/TopBar'
+import { layout, type } from './src/ui/theme'
+import Ajustes from './src/screens/Ajustes'
+import ARua from './src/screens/ARua'
 import Conexao from './src/screens/Conexao'
+import Diario from './src/screens/Diario'
 import Identidade from './src/screens/Identidade'
-import Perfil from './src/screens/Perfil'
 import Publicar from './src/screens/Publicar'
 import Seguindo from './src/screens/Seguindo'
-import ARua from './src/screens/ARua'
-import Diario from './src/screens/Diario'
-import Sincronizar from './src/screens/Sincronizar'
 
 // Inlined by Expo at build time; set only for the iOS worklet gate
 // (docs/ios-gate.md).
 const GATE_URL = process.env.EXPO_PUBLIC_VARANDA_GATE_URL
 
-const TABS = [
-  { id: 'identidade', label: 'Identidade' },
-  { id: 'perfil', label: 'Perfil' },
-  { id: 'publicar', label: 'Publicar' },
-  { id: 'seguindo', label: 'Seguindo' },
-  { id: 'rua', label: 'A Rua' },
-  { id: 'diario', label: 'Diário' },
-  { id: 'sincronizar', label: 'Sincronizar' },
-  { id: 'conexao', label: 'Conexão' }
-]
+const TOAST_MS = 2500
+
+// True when node.info confirms an identity and a member certificate.
+function setupComplete (info) {
+  return info !== null && info.publicKey !== null && info.memberCert === true
+}
 
 function Member () {
   const node = useNode()
-  const [tab, setTab] = useState('identidade')
-  const [reply, setReply] = useState(null)
+  const names = useNames()
+  const insets = useSafeAreaInsets()
+  const { width } = useWindowDimensions()
   const ready = node.phase === 'ready'
   // Once the node was ready the tree stays mounted for good: a disconnect,
-  // another tab taking over or a restart only adds a banner, so drafts
-  // survive.
+  // another tab taking over or a restart only changes the sync chip, so
+  // drafts survive.
   const [seen, setSeen] = useState(false)
   useEffect(() => { if (ready) setSeen(true) }, [ready])
+
+  const [tab, setTab] = useState('rua')
+  const [composer, setComposer] = useState({ open: false, reply: null })
+  const [ajustes, setAjustes] = useState(null)
+  const [version, setVersion] = useState(0)
+  const [info, setInfo] = useState(null)
+  const [infoError, setInfoError] = useState('')
+  // Latched once node.info confirmed the identity and the certificate: a
+  // later failed or slow read never hides the tabs again.
+  const [setupDone, setSetupDone] = useState(false)
+  const [toast, setToast] = useState('')
+  const toastTimer = useRef(null)
+
+  // Stable (Identidade and Ajustes re-read node.info when it changes).
+  const takeInfo = useCallback((i) => {
+    setInfo(i)
+    setInfoError('')
+  }, [])
+
+  const readInfo = useCallback(async () => {
+    try {
+      takeInfo(await node.request('node.info', {}))
+    } catch (err) {
+      setInfoError(errorText(err))
+    }
+  }, [node.request, takeInfo])
+
+  useEffect(() => { if (ready) readInfo() }, [ready, version, readInfo])
+
+  const confirmed = setupComplete(info)
+  useEffect(() => { if (confirmed) setSetupDone(true) }, [confirmed])
+  const setupStep = !setupDone && !confirmed
+
+  // The feed carries only followed authors' names: look the own name up
+  // once (one log.read through the names cache) for the Publicar avatar.
+  const ownKey = info ? info.publicKey : null
+  const { resolve } = names
+  useEffect(() => { if (setupDone && ownKey) resolve(ownKey) }, [setupDone, ownKey, resolve])
+
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
+
+  const showToast = (text) => {
+    clearTimeout(toastTimer.current)
+    setToast(text)
+    toastTimer.current = setTimeout(() => setToast(''), TOAST_MS)
+  }
+
+  // The chip always opens Sincronizar; that screen offers Conexão when the
+  // node is disconnected.
+  const openChip = () => setAjustes('sincronizar')
+  const startReply = (r) => setComposer({ open: true, reply: r })
 
   if (!ready && !seen) {
     // loading, connecting, the native Conectar form, or a web error.
     if (node.phase === 'loading' || (node.phase === 'connecting' && !node.canConfigure)) {
       return (
-        <View style={styles.center}>
+        <SafeAreaView style={styles.center} edges={['top', 'bottom']}>
           <Text style={styles.brand}>Varanda</Text>
           <Text style={styles.soft}>conectando…</Text>
-        </View>
+          <StatusBar style='dark' />
+        </SafeAreaView>
       )
     }
-    return <Conexao />
+    return (
+      <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
+        <Conexao />
+        <StatusBar style='dark' />
+      </SafeAreaView>
+    )
   }
 
-  // Every screen stays mounted (drafts survive a tab change); `active`
-  // makes a screen reload its data when it is shown, and again when the
-  // connection comes back.
-  const is = (id) => tab === id
-  const on = (id) => is(id) && ready
-  const shown = (id) => (is(id) ? styles.shown : styles.hidden)
-  return (
-    <View style={styles.flex}>
-      <Text style={styles.brand}>Varanda</Text>
-      {!ready
-        ? (
-          <View style={styles.banner}>
-            <Text style={styles.bannerText}>
-              {node.phase === 'connecting' || node.phase === 'loading' ? 'reconectando…' : (node.error || 'sem conexão com o nó')}
-            </Text>
-            {node.phase !== 'connecting' && node.phase !== 'loading'
-              ? <Btn label='reconectar' onPress={() => node.reconnect()} secondary />
-              : null}
-          </View>
-          )
-        : null}
-      <Tabs tabs={TABS} current={tab} onSelect={setTab} />
-      <View style={shown('identidade')}><Identidade active={on('identidade')} /></View>
-      <View style={shown('perfil')}><Perfil /></View>
-      <View style={shown('publicar')}><Publicar reply={reply} onClearReply={() => setReply(null)} /></View>
-      <View style={shown('seguindo')}><Seguindo active={on('seguindo')} /></View>
-      <View style={shown('rua')}>
-        <ARua active={on('rua')} onReply={(r) => { setReply(r); setTab('publicar') }} />
+  const chip = <SyncChip onPress={openChip} />
+  const connectionLink = (
+    <Pressable
+      style={[styles.link, { paddingBottom: 14 + insets.bottom }]}
+      accessibilityRole='button'
+      accessibilityLabel='Conexão'
+      onPress={() => setAjustes('conexao')}
+      hitSlop={4}
+    >
+      <Text style={styles.linkText}>Conexão</Text>
+    </Pressable>
+  )
+
+  // On a wide web window the setup step and the tabs share one centred column.
+  const wide = Platform.OS === 'web' && width > layout.column
+  let content
+  if (setupStep) {
+    // The first setup (identity, member certificate) before the tabs. The
+    // tabs never render before a successful node.info confirms both.
+    let body
+    if (info !== null) {
+      // embedded: the top bar above already carries the 'Identidade' title
+      body = <Identidade active={ready} embedded onInfo={takeInfo} />
+    } else if (infoError) {
+      body = (
+        <View style={styles.setupBody}>
+          <ErrorText>{infoError}</ErrorText>
+          <Btn label='tentar de novo' onPress={readInfo} disabled={!ready} />
+        </View>
+      )
+    } else {
+      body = <View style={styles.setupBody}><Soft>carregando…</Soft></View>
+    }
+    content = (
+      <View style={[styles.shell, wide && styles.shellWide]}>
+        <TopBar title='Identidade' right={chip} />
+        <View style={styles.flex}>{body}</View>
+        {connectionLink}
       </View>
-      <View style={shown('diario')}><Diario active={on('diario')} /></View>
-      <View style={shown('sincronizar')}><Sincronizar /></View>
-      <View style={shown('conexao')}><Conexao active={on('conexao')} /></View>
+    )
+  } else {
+    // The three tabs stay mounted (drafts and scroll survive a tab change);
+    // `active` makes a screen reload its data when it is shown, and again
+    // when the connection comes back.
+    const on = (id) => tab === id && ready
+    const shown = (id) => (tab === id ? styles.flex : styles.hidden)
+    content = (
+      <View style={[styles.shell, wide && styles.shellWide]}>
+        {tab !== 'diario'
+          ? <TopBar title={tab === 'rua' ? 'A Rua' : 'Seguindo'} right={chip} />
+          : null}
+        <View style={styles.flex}>
+          <View style={shown('rua')}><ARua active={on('rua')} refresh={version} onReply={startReply} /></View>
+          <View style={shown('seguindo')}><Seguindo active={on('seguindo')} /></View>
+          <View style={shown('diario')}>
+            <Diario active={on('diario')} refresh={version} onSettings={setAjustes} onReply={startReply} />
+          </View>
+        </View>
+        {toast
+          ? (
+            <View style={[styles.toast, { bottom: layout.tabBar + insets.bottom + 12 }]} pointerEvents='none'>
+              <Text style={styles.toastText} accessibilityRole='alert'>{toast}</Text>
+            </View>
+            )
+          : null}
+        <Fab onPress={() => setComposer((c) => ({ ...c, open: true }))} />
+        <TabBar current={tab} onSelect={setTab} />
+      </View>
+    )
+  }
+
+  const me = {
+    publicKey: info ? info.publicKey : null,
+    name: info && info.publicKey ? (names.nameOf(info.publicKey) || null) : null
+  }
+  // Light over the Diário band. The sheets leave the status bar over the
+  // (dimmed) screen behind, so they keep it light there too.
+  const light = tab === 'diario' && !setupStep
+
+  return (
+    <View style={styles.root}>
+      {content}
+      <Publicar
+        open={composer.open}
+        reply={composer.reply}
+        me={me}
+        onClose={() => setComposer((c) => ({ ...c, open: false }))}
+        onClearReply={() => setComposer((c) => ({ ...c, reply: null }))}
+        onPublished={(kind, sentRef) => {
+          // The reply context is dropped only if it is still the one sent.
+          setComposer((c) => ({ open: false, reply: c.reply && c.reply.ref === sentRef ? null : c.reply }))
+          setVersion((v) => v + 1)
+          showToast(kind === 'reply' ? 'resposta publicada' : 'publicado')
+        }}
+      />
+      <Ajustes screen={ajustes} onNavigate={setAjustes} onClose={() => setAjustes(null)} onInfo={takeInfo} />
+      <StatusBar style={light ? 'light' : 'dark'} />
     </View>
   )
 }
 
 export default function App () {
+  useEffect(() => { loadIcons().catch(() => {}) }, [])
   if (GATE_URL) {
     const GateScreen = require('./src/gate/GateScreen').default
     return (
@@ -99,23 +230,34 @@ export default function App () {
   }
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.flex} edges={['top', 'bottom', 'left', 'right']}>
-        <NodeProvider>
+      <NodeProvider>
+        <NamesProvider>
           <Member />
-        </NodeProvider>
-        <StatusBar style='dark' />
-      </SafeAreaView>
+        </NamesProvider>
+      </NodeProvider>
     </SafeAreaProvider>
   )
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1, backgroundColor: colors.bg },
+  hidden: { display: 'none' },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  brand: { fontSize: 18, fontWeight: '700', color: colors.accent, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, backgroundColor: colors.card },
-  banner: { backgroundColor: '#fff4e0', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
-  bannerText: { fontSize: 14, color: colors.warn },
+  brand: { fontSize: 18, fontWeight: '700', color: colors.accent },
   soft: { fontSize: 14, color: colors.soft },
-  shown: { flex: 1 },
-  hidden: { display: 'none' }
+  shell: { flex: 1, width: '100%', maxWidth: layout.column, alignSelf: 'center', backgroundColor: colors.bg },
+  shellWide: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.line },
+  setupBody: { padding: 16, gap: 12 },
+  link: { alignItems: 'center', paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.bg },
+  linkText: { fontSize: 15, fontWeight: '600', color: colors.accent },
+  toast: {
+    position: 'absolute',
+    alignSelf: 'center',
+    backgroundColor: colors.ink,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14
+  },
+  toastText: { ...type.counter, color: '#ffffff' }
 })

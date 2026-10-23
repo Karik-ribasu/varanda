@@ -14,7 +14,19 @@ const REASONS = {
   error: 'erro'
 }
 
-export default function Sincronizar () {
+// Time the last run ended, or '' when it is missing or unreadable.
+function endTime (at) {
+  if (at === undefined || at === null) return ''
+  try {
+    const d = new Date(at)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
+  }
+}
+
+export default function Sincronizar ({ embedded = false, onOpenConnection }) {
   const node = useNode()
   const { sync } = node
   // "iniciada" lasts as long as that run; "nenhuma ... em andamento" until
@@ -41,14 +53,16 @@ export default function Sincronizar () {
   const stopped = sync.stopped
   return (
     <Page>
-      <Title>Sincronizar</Title>
+      {embedded ? null : <Title>Sincronizar</Title>}
       <Card>
+        {node.phase !== 'ready' ? <Soft>sem conexão com o nó</Soft> : null}
+        {node.phase !== 'ready' && typeof onOpenConnection === 'function' ? <Btn label='abrir Conexão' secondary onPress={onOpenConnection} /> : null}
         <Body>
           {running
             ? 'sincronizando (' + (sync.active.once ? 'uma vez' : 'contínuo') + ', execução ' + String(sync.active.runId) + ')'
             : 'parado'}
         </Body>
-        {!running && stopped ? <Soft>{'última execução ' + String(stopped.runId) + ': ' + (REASONS[stopped.reason] || displayText(stopped.reason))}</Soft> : null}
+        {!running && stopped ? <Soft>{'última execução ' + String(stopped.runId) + ': ' + (REASONS[stopped.reason] || displayText(stopped.reason)) + (endTime(stopped.at) ? ', às ' + endTime(stopped.at) : '')}</Soft> : null}
         <ErrorText>{start.error || stop.error}</ErrorText>
         <Notice>{note}</Notice>
         <Row>

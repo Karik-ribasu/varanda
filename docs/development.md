@@ -65,7 +65,7 @@ One file, from the repo root:
 node apps/cli/test/serve.test.js
 ```
 
-`apps/app` tests only the form rules of `src/config.js` (`apps/app/test/config.test.js`; the module is loaded with `import()` through Node's module syntax detection, which prints a `MODULE_TYPELESS_PACKAGE_JSON` warning). The screens have no automated tests. Network tests use an in-process local DHT bound to `127.0.0.1`. No test uses the public DHT.
+`apps/app` runs its pure helper tests with `npm test -w apps/app`: the form rules of `src/config.js` (`apps/app/test/config.test.js`) and the display helpers of `src/format.js` (`apps/app/test/format.test.js`); the modules are loaded with `import()` through Node's module syntax detection, which prints a `MODULE_TYPELESS_PACKAGE_JSON` warning. There are no UI tests: the screens are checked by hand on the simulator and on the web. Network tests use an in-process local DHT bound to `127.0.0.1`. No test uses the public DHT.
 
 ### Bare desktop smoke test
 
@@ -111,7 +111,7 @@ npm run ios                          # expo run:ios
 
 - `link:addons` runs `scripts/link-addons.sh`. It fails unless rocksdb-native, udx-native, sodium-native and bare-fs are linked for every platform it handles. The linked addons live in `node_modules/react-native-bare-kit`, so every install wipes them.
 - `pack:worklet` runs `scripts/pack-worklet.sh` and writes `apps/app/assets/worklet/main.bundle.js` (generated and ignored by version control).
-- `ios/` and `android/` are committed. Regenerate them only with `npx expo prebuild --no-install` from `apps/app`, and never with `--clean` without re-applying three hand edits that prebuild does not generate: `ios/Varanda/AppDelegate.swift` marks `Documents/varanda` (the node's key material) as excluded from iCloud and device backups; `android/app/build.gradle` signs release builds only with a key supplied outside the repository and gives debug builds the `.debug` application ID suffix. Android's `allowBackup: false` is in `app.json`, so prebuild keeps it.
+- `ios/` and `android/` are committed. They are hand-maintained and must never be regenerated with `expo prebuild`, which would overwrite three hand edits it does not generate: `ios/Varanda/AppDelegate.swift` marks `Documents/varanda` (the node's key material) as excluded from iCloud and device backups; `android/app/build.gradle` signs release builds only with a key supplied outside the repository and gives debug builds the `.debug` application ID suffix. Android's `allowBackup: false` is in `app.json`, so prebuild keeps it.
 - `npm run gate -w apps/app` is the gate driver (`scripts/gate-server.js`), used with a Metro started with `EXPO_PUBLIC_VARANDA_GATE_URL`. See ios-gate.md.
 
 ## Android

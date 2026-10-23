@@ -31,26 +31,58 @@ Só o app nativo tem essa tela. Ela pede:
 
 Com a DHT pública ligada, o endereço local da DHT não pode ser de loopback (`127.x.x.x`, `localhost`, `::1`): uma DHT presa ao próprio aparelho nunca alcança um par público. O formulário recusa com "com a DHT pública, apague o endereço local da DHT: ... só alcança este aparelho", e o nó recusa a mesma combinação. Uma configuração gravada antes dessa regra perde só esse endereço quando o app a lê.
 
-A DHT pública é uma escolha ativa da pessoa (opt-in). Sem bootstrap e sem o interruptor ligado, o nó não tem como achar pares. A configuração, que não é segredo, fica em `Documents/varanda-config.json`, fora do diretório de dados do nó, e só é gravada depois que o nó inicia com ela. A aba Conexão mostra a mesma configuração depois: dá para trocar o bootstrap ou a DHT pública (o nó reinicia), mas a associação fica só para leitura depois que a identidade existe.
+A DHT pública é uma escolha ativa da pessoa (opt-in). Sem bootstrap e sem o interruptor ligado, o nó não tem como achar pares. A configuração, que não é segredo, fica em `Documents/varanda-config.json`, fora do diretório de dados do nó, e só é gravada depois que o nó inicia com ela. Ajustes › Conexão mostra a mesma configuração depois: dá para trocar o bootstrap ou a DHT pública (o nó reinicia), mas a associação fica só para leitura depois que a identidade existe.
 
-### Na web: sem onboarding
+Depois do Conectar (ou, na web, logo de início), a etapa Identidade aparece sozinha, sem as abas, até a identidade existir e o certificado estar gravado. Nela, um link "Conexão" abre Ajustes › Conexão.
 
-A web não tem essa etapa. A associação, o bootstrap e a DHT vêm das opções do `varanda-serve`. O token chega no fragmento da URL (`#token=...`) que o `varanda-serve` imprime. O app o lê uma vez, tira o fragmento da barra de endereço (`history.replaceState`), o guarda só em memória (nem `localStorage`, nem cookie) e o envia em `session.open`. O navegador não envia o fragmento ao servidor. A página só conecta se foi aberta em `127.0.0.1` ou `localhost`. Ela não reconecta sozinha: a aba Conexão tem o botão "reconectar". Se outra aba abrir a sessão, esta mostra "outra aba assumiu a conexão".
+### Na web: sem Conectar
+
+A web não tem a tela Conectar, mas tem a mesma etapa Identidade e certificado. A associação, o bootstrap e a DHT vêm das opções do `varanda-serve`. O token chega no fragmento da URL (`#token=...`) que o `varanda-serve` imprime. O app o lê uma vez, tira o fragmento da barra de endereço (`history.replaceState`), o guarda só em memória (nem `localStorage`, nem cookie) e o envia em `session.open`. O navegador não envia o fragmento ao servidor. A página só conecta se foi aberta em `127.0.0.1` ou `localhost`. Ela não reconecta sozinha: Ajustes › Conexão tem o botão "reconectar". Se outra aba abrir a sessão, esta mostra "outra aba assumiu a conexão".
 
 ## Telas
 
-Os nomes estão fixos; os detalhes visuais ainda mudam.
+Os nomes estão fixos; os detalhes visuais ainda mudam. O desenho (cores, tamanhos, componentes) está em [app-design.md](../apps/site/artwork/app-design.md); as funções e o protocolo são os mesmos de antes.
 
-- **Identidade.** Cria a identidade e mostra a chave pública e o estado do certificado de membro. Aceita colar o JSON do certificado emitido pela associação.
-- **Perfil.** Nome (1 a 80 caracteres) e bio (0 a 280).
-- **Publicar.** Escreve uma publicação (1 a 1000 caracteres). Também responde a uma publicação a partir de A Rua.
-- **Seguindo.** Segue ou deixa de seguir por chave pública. A lista é paginada.
-- **A Rua.** O feed, da mais nova para a mais antiga. Abre com 30 publicações; "carregar mais" chega ao máximo de 35 (`FEED_LIMIT_MAX`, em [rpc.md](rpc.md)) e depois avisa que as mais antigas não estão disponíveis nesta versão. Por ora A Rua mostra só os diários seguidos; trazer quem a pessoa não segue é uma mudança de desenho descrita em [design.md](design.md).
-- **Diário.** O diário da própria pessoa: só a página mais recente. Blocos inválidos aparecem como "bloco inválido (#seq: motivo)".
-- **Sincronizar.** Sincroniza uma vez ou de modo contínuo, para a sincronização e mostra as últimas 200 linhas de evento.
-- **Conexão.** No app nativo, a configuração da tela Conectar; na web, o estado da conexão com o `varanda-serve` e o botão "reconectar".
+O app tem três abas na barra de baixo: **A Rua**, **Seguindo** e **Diário** (abre em A Rua). Um botão verde, "publicar", abre a folha de Publicar por cima de qualquer aba. Os ajustes ficam numa folha aberta pela engrenagem do cabeçalho do Diário. No app nativo, a primeira configuração acontece antes das abas (veja "Primeira configuração").
 
-Um pedido que muda algo e fica sem resposta (tempo esgotado ou conexão perdida) aparece como "incerto: pode ter sido aplicado; confira antes de repetir". O app não reenvia esse pedido sozinho e mantém o rascunho.
+- **Barra do topo (A Rua e Seguindo).** A cadeira, o título e o chip de sincronia, que mostra o estado em uma palavra: "sem conexão", "sincronizando…", "sincronizado agora" (ou "sincronizado há N min") depois de uma rodada que terminou por `done` e sem `result.ok` falso, ou "sincronizar" quando não há rodada concluída. O chip sempre abre Ajustes › Sincronizar, que oferece "abrir Conexão" quando não há conexão. Não há faixa de conexão sobre a linha do tempo: o estado fica só no chip e em Ajustes › Conexão.
+- **A Rua.** O feed, da mais nova para a mais antiga, numa linha do tempo contínua. Cada publicação tem avatar com as duas iniciais do nome (a cor vem do primeiro byte da chave, módulo 5: azul, laranja, amarelo, vermelho, verde), o nome em negrito (sem nome, o handle: `@` e os seis primeiros dígitos hexadecimais da chave), o tempo relativo ("agora", "5 min", "1 h", "ontem", "12 out") e uma única ação, "responder". Uma resposta mostra "respondendo a Nome": o nome vem do perfil do diário seguido, ou o handle se não houver. Abre com 30 publicações; ao rolar até o fim chega ao máximo de 35 (`FEED_LIMIT_MAX`, em [rpc.md](rpc.md)) e depois avisa que as mais antigas não estão disponíveis nesta versão. Puxar para baixo recarrega (no app nativo; na web, o botão "atualizar"). A lista recarrega sozinha quando uma rodada de sincronização termina (menos quando foi interrompida por outro pedido) e depois de publicar; os avisos de itens ignorados ou com data futura continuam. Por ora A Rua mostra só os diários seguidos; trazer quem a pessoa não segue é uma mudança de desenho descrita em [design.md](design.md).
+- **Publicar.** Folha com "Cancelar", a pílula "Publicar" (desligada com o texto vazio ou acima de 1000 pontos de código), o avatar da própria pessoa, o campo "O que está rolando na varanda?", um anel de progresso e o contador "N/1000" (vermelho em 1000). Responder usa a mesma folha, com "respondendo a Nome" e "cancelar resposta". O rascunho sobrevive ao fechar a folha e a qualquer falha; um pedido incerto nunca é reenviado.
+- **Seguindo.** No topo, o campo da chave e a pílula "Seguir". Cada linha tem avatar, nome, handle (tocar mostra a chave inteira) e a pílula "Seguindo", que deixa de seguir e lê a lista de novo. A lista é paginada.
+- **Diário.** O perfil e o diário da própria pessoa. Uma faixa em gradiente passa por trás da barra de estado, com a engrenagem dos ajustes; embaixo, avatar de 88 pt, o botão "Editar perfil", o nome, o handle (tocar mostra a chave inteira), a bio e "N seguindo" (não há seguidores). Falta o certificado? Uma linha de aviso diz isso. Em "PUBLICAÇÕES" ficam as publicações da pessoa no estilo da linha do tempo, só a página mais recente; perfil, certificado e blocos inválidos aparecem como linhas técnicas discretas ("bloco inválido (#seq: motivo)").
+- **Editar perfil.** Folha com nome (1 a 80 caracteres) e bio (0 a 280), preenchida com o registro de perfil mais novo entre os 42 blocos mais novos do próprio diário; "Cancelar" descarta.
+- **Ajustes.** Folha com três itens, sem mudança de função:
+  - **Conexão.** No app nativo, a configuração da tela Conectar; na web, o estado da conexão com o `varanda-serve` e o botão "reconectar".
+  - **Sincronizar.** Sincroniza uma vez ou de modo contínuo, para a sincronização e mostra as últimas 200 linhas de evento.
+  - **Identidade.** Cria a identidade e mostra a chave pública e o estado do certificado de membro. Aceita colar o JSON do certificado emitido pela associação.
+
+Na web, as folhas fecham com Escape.
+
+### Nomes
+
+O RPC não tem um método que troque chave por nome. O app guarda um cache de nomes por sessão: aprende com o feed (cada item traz o nome atual do autor) e, para cada chave desconhecida em Seguindo, nas marcas de resposta e para a própria chave (o avatar de Publicar), faz um `log.read { author }`, um de cada vez, parado durante uma sincronização (um pedido de membro interrompe a rodada) e repetido quando uma rodada termina. Enquanto uma sincronização roda (por exemplo com "sincronizar sempre"), as buscas de nome ficam paradas: as linhas de Seguindo e as marcas de "respondendo a" mostram o handle (@ mais 6 dígitos hexadecimais) de quem o feed ainda não nomeou, até a sincronização parar. Dois limites:
+
+- `log.read { author }` devolve só os 42 blocos mais novos do diário ([rpc.md](rpc.md), 5.12). Quem seguiu alguém cujo registro de perfil é mais antigo que isso vê o handle nas linhas de Seguindo e nas marcas de resposta, a menos que o feed, que lê o diário inteiro, já tenha dado o nome.
+- Um nome aprendido vale a sessão toda. Se uma pessoa seguida muda o perfil e não tem publicações no feed, o app mantém o nome antigo até ser reiniciado (quem tem publicações é atualizado pelo feed).
+
+Todo nome, como todo texto de outros pares, passa por `displayText`.
+
+### Navegação
+
+Onde ficou cada uma das oito telas de antes:
+
+| Tela de antes | Onde fica |
+|---|---|
+| A Rua | aba A Rua |
+| Seguindo | aba Seguindo |
+| Diário | aba Diário (o perfil em cima, as publicações embaixo) |
+| Perfil | Diário › Editar perfil |
+| Publicar | botão "publicar" (folha); "responder" em qualquer publicação |
+| Sincronizar | Ajustes › Sincronizar (o chip de sincronia abre a mesma tela) |
+| Conexão | Ajustes › Conexão (no app nativo, também a tela Conectar da primeira vez) |
+| Identidade | Ajustes › Identidade (na primeira configuração, a etapa Identidade) |
+
+Um pedido que muda algo e fica sem resposta (tempo esgotado ou conexão perdida) aparece como "incerto: pode ter sido aplicado; confira antes de repetir". O app nunca reenvia esse pedido sozinho. Antes de oferecer a ação de novo, ele lê o estado outra vez. Publicar relê o próprio diário: se a publicação está lá (mesmo texto e mesma resposta, criada por este envio), conta como publicada, limpa o rascunho e fecha a folha; senão o rascunho fica, com a mensagem "incerto: pode ter sido aplicado; confira antes de repetir". Editar perfil faz a mesma conferência no registro de perfil mais novo. Seguindo relê a lista depois de qualquer falha ao seguir ou deixar de seguir.
 
 Só um nó usa um diretório de dados por vez: um segundo worklet no mesmo diretório recebe `LOCKED`. Todo texto vindo de outros pares passa por `displayText`, do `@varanda/rpc`, antes de aparecer.
 

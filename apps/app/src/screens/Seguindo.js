@@ -1,20 +1,70 @@
-// Seguindo: follow.add, follow.remove, follow.list (offset paging).
+// Seguindo: follow.add, follow.remove, follow.list (offset paging). Rows show
+// the avatar, the name (learned through the names cache) and the handle, with
+// a "Seguindo" pill to unfollow. Design: apps/site/artwork/app-design.md.
 
 import { useCallback, useEffect, useState } from 'react'
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { FOLLOW_LIMIT_MAX, displayText, isKey } from '@varanda/rpc'
 import { useNode, useNotice } from '../node'
-import { Btn, Card, ErrorText, Field, Mono, Notice, Page, Soft, Title, errorText, useAction } from '../ui'
+import { useNames } from '../names'
+import { handleOf } from '../format'
+import { ErrorText, Field, Mono, Notice, SectionHeader, Soft, errorText, useAction, useBottomPad } from '../ui'
+import { Avatar } from '../ui/Avatar'
+import { Pill } from '../ui/Pill'
+import { colors, type } from '../ui/theme'
 
 const PAGE = 50
 
+// One followed diary. Tapping the name column shows the whole key.
+function FollowRow ({ followKey, name, onRemove, pending, disabled }) {
+  const [open, setOpen] = useState(false)
+  const handle = displayText(handleOf(followKey))
+  const named = typeof name === 'string' && name !== ''
+  return (
+    <View style={styles.row}>
+      <Avatar name={named ? name : null} publicKey={followKey} size={44} />
+      <Pressable
+        style={styles.who}
+        accessibilityRole='button'
+        accessibilityLabel='mostrar a chave inteira'
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((v) => !v)}
+      >
+        {named
+          ? (
+            <>
+              <Text style={styles.name} numberOfLines={1}>{displayText(name)}</Text>
+              <Text style={styles.handle} numberOfLines={1}>{handle}</Text>
+            </>
+            )
+          : <Text style={styles.name} numberOfLines={1}>{handle}</Text>}
+        {open ? <Mono>{displayText(followKey)}</Mono> : null}
+      </Pressable>
+      <Pill
+        label='Seguindo'
+        onPress={() => onRemove(followKey)}
+        pending={pending}
+        disabled={disabled}
+        accessibilityLabel={'deixar de seguir ' + handle}
+      />
+    </View>
+  )
+}
+
 export default function Seguindo ({ active }) {
   const node = useNode()
+  const names = useNames()
+  const bottomPad = useBottomPad()
   const [keys, setKeys] = useState([])
   const [total, setTotal] = useState(0)
   const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [input, setInput] = useState('')
   const [localError, setLocalError] = useState('')
+  // True while follow.list is re-read after a change: no new change until then.
+  const [rereading, setRereading] = useState(false)
+  // The key being removed: only its row shows "Seguindo…".
+  const [removing, setRemoving] = useState(null)
   const [done, setDone] = useNotice()
   const add = useAction()
   const remove = useAction()
@@ -33,7 +83,27 @@ export default function Seguindo ({ active }) {
     }
   }, [node.request])
 
+  // After any follow change (success or failure, uncertain included) the list
+  // is re-read before the person can act again; the error text stays.
+  const reread = async () => {
+    setRereading(true)
+    try {
+      await reload(keys.length)
+    } finally {
+      setRereading(false)
+    }
+  }
+
   useEffect(() => { if (active) reload(PAGE) }, [active, reload])
+
+  // Looks up the names of the keys not in the cache yet (one log.read at a
+  // time, paused during a sync); rows re-render as names arrive.
+  const { nameOf, resolve } = names
+  useEffect(() => {
+    for (const key of keys) {
+      if (nameOf(key) === undefined) resolve(key)
+    }
+  }, [keys, nameOf, resolve])
 
   const doAdd = async () => {
     setDone('')
@@ -44,16 +114,19 @@ export default function Seguindo ({ active }) {
     if (r.ok) {
       setInput('')
       setDone(r.value.changed ? 'seguindo' : 'você já seguia esta chave')
-      reload(keys.length)
     }
+    await reread()
   }
 
   const doRemove = async (key) => {
     setDone('')
-    const r = await remove.run(() => node.request('follow.remove', { key }))
-    if (r.ok) {
-      setDone(r.value.changed ? 'deixou de seguir' : 'esta chave não estava na lista')
-      reload(keys.length)
+    setRemoving(key)
+    try {
+      const r = await remove.run(() => node.request('follow.remove', { key }))
+      if (r.ok) setDone(r.value.changed ? 'deixou de seguir' : 'esta chave não estava na lista')
+      await reread()
+    } finally {
+      setRemoving(null)
     }
   }
 
@@ -65,32 +138,84 @@ export default function Seguindo ({ active }) {
     }
   }
 
-  return (
-    <Page>
-      <Title>Seguindo</Title>
-      <Card>
-        <Field label='chave pública do diário (64 dígitos hexadecimais)' value={input} onChangeText={setInput} mono multiline lines={2} />
-        <ErrorText>{localError || add.error}</ErrorText>
-        <Btn label='seguir' onPress={doAdd} pending={add.pending} disabled={input.trim() === ''} />
-      </Card>
+  const changing = add.pending || remove.pending || rereading
+
+  const header = (
+    <View style={styles.header}>
+      <Field
+        placeholder='chave pública do diário (64 dígitos hexadecimais)'
+        value={input}
+        onChangeText={setInput}
+        mono
+        multiline
+        lines={2}
+      />
+      <View style={styles.addRow}>
+        <Pill label='Seguir' filled onPress={doAdd} pending={add.pending} disabled={input.trim() === '' || changing} />
+      </View>
+      <ErrorText>{localError || add.error}</ErrorText>
       <Notice>{done}</Notice>
       <ErrorText>{loadError || remove.error}</ErrorText>
-      {loaded ? <Soft>{String(total) + (total === 1 ? ' diário seguido' : ' diários seguidos')}</Soft> : null}
-      {keys.map((key) => (
-        <Card key={key}>
-          <Mono>{displayText(key)}</Mono>
-          <Btn label='deixar de seguir' onPress={() => doRemove(key)} pending={remove.pending} danger />
-        </Card>
-      ))}
-      {loaded && keys.length < total
-        ? (
-          <>
-            <ErrorText>{more.error}</ErrorText>
-            <Btn label='mais' onPress={doMore} pending={more.pending} secondary />
-          </>
-          )
+    </View>
+  )
+
+  const footer = loaded && keys.length < total
+    ? (
+      <View style={styles.footer}>
+        <ErrorText>{more.error}</ErrorText>
+        <Pill label='mais' onPress={doMore} pending={more.pending} />
+      </View>
+      )
+    : null
+
+  return (
+    <FlatList
+      style={styles.list}
+      contentContainerStyle={{ paddingBottom: bottomPad }}
+      keyboardShouldPersistTaps='handled'
+      data={keys}
+      keyExtractor={(key) => key}
+      ListHeaderComponent={
+        <>
+          {header}
+          <SectionHeader right={loaded ? <Soft>{String(total) + (total === 1 ? ' diário' : ' diários')}</Soft> : null}>
+            Seguindo
+          </SectionHeader>
+        </>
+      }
+      ListEmptyComponent={loaded && total === 0
+        ? <View style={styles.empty}><Soft>Você ainda não segue ninguém.</Soft></View>
         : null}
-      {loaded && total === 0 ? <Soft>Você ainda não segue ninguém.</Soft> : null}
-    </Page>
+      renderItem={({ item }) => (
+        <FollowRow
+          followKey={item}
+          name={nameOf(item)}
+          onRemove={doRemove}
+          pending={removing === item}
+          disabled={changing}
+        />
+      )}
+      ListFooterComponent={footer}
+    />
   )
 }
+
+const styles = StyleSheet.create({
+  list: { flex: 1, backgroundColor: colors.bg },
+  header: { paddingVertical: 12, paddingHorizontal: 16, gap: 8 },
+  addRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line
+  },
+  who: { flex: 1, minWidth: 0 },
+  name: { ...type.postName, color: colors.ink },
+  handle: { ...type.postMeta, color: colors.soft },
+  empty: { paddingVertical: 16, paddingHorizontal: 16 },
+  footer: { paddingVertical: 12, paddingHorizontal: 16, gap: 8, alignItems: 'center' }
+})
