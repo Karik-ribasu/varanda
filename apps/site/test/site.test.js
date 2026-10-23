@@ -173,8 +173,10 @@ test('every SVG under public/ is inert', (t) => {
 // Budgets (bytes). Measured on 2026-10-22, each set about 25% above:
 //   index.html 22256 + styles.css 23381 = 45637  -> 57000
 //   all of public/ = 278493 with og-varanda.jpg    -> 348000
+// 2026-10-23: the app preview became ~96 KB of WebP screenshots,
+//   all of public/ = 350910                        -> 360000
 const BUDGET_PAGE = 57000
-const BUDGET_TOTAL = 348000
+const BUDGET_TOTAL = 360000
 const BUDGET_OG = 200 * 1024
 
 test('size budgets', (t) => {
@@ -191,42 +193,39 @@ test('size budgets', (t) => {
   }
 })
 
-// The app preview: each mock screen is one role="img" element, labelled, with
-// nothing focusable or interactive inside (spans, divs and inline SVG only).
-test('every role="img" element has a label and contains nothing interactive', (t) => {
-  const starts = [...html.matchAll(/<([a-z0-9]+)\s[^>]*\brole="img"[^>]*>/g)]
-  t.ok(starts.length > 0, 'role="img" elements found (' + starts.length + ')')
-  for (const m of starts) {
-    const a = attrs(m[0])
-    t.ok(a['aria-label'] && a['aria-label'].trim() !== '', 'aria-label on ' + m[0].slice(0, 60))
-    // the element's inner HTML: walk the tags from the start tag to its matching close
-    const tag = m[1]
-    const open = new RegExp('<' + tag + '[\\s>]', 'g')
-    const close = new RegExp('</' + tag + '>', 'g')
-    let depth = 1
-    let i = m.index + m[0].length
-    let end = -1
-    while (depth > 0) {
-      open.lastIndex = i
-      close.lastIndex = i
-      const o = open.exec(html)
-      const c = close.exec(html)
-      if (!c) break
-      if (o && o.index < c.index) { depth++; i = o.index + 1 } else { depth--; i = c.index + 1; end = c.index }
-    }
-    t.ok(end > 0, 'closing tag found')
-    const inner = html.slice(m.index + m[0].length, end)
-    for (const bad of ['a', 'button', 'input', 'select', 'textarea', 'label']) {
-      t.absent(new RegExp('<' + bad + '[\\s>/]', 'i').test(inner), 'no <' + bad + '> inside ' + a['aria-label'].slice(0, 40))
-    }
-    t.absent(/\stabindex\s*=/i.test(inner), 'no tabindex inside ' + a['aria-label'].slice(0, 40))
+// WebP pixel size from the file header: lossy (VP8 ), lossless (VP8L) or extended (VP8X).
+function webpSize (buf) {
+  const kind = buf.toString('latin1', 12, 16)
+  if (kind === 'VP8 ') return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff }
+  if (kind === 'VP8L') {
+    const bits = buf.readUInt32LE(21)
+    return { w: (bits & 0x3fff) + 1, h: ((bits >>> 14) & 0x3fff) + 1 }
   }
-})
+  if (kind === 'VP8X') return { w: buf.readUIntLE(24, 3) + 1, h: buf.readUIntLE(27, 3) + 1 }
+  return { w: 0, h: 0 }
+}
 
-test('the page references no assets/screens/ file', (t) => {
-  t.absent(/assets\/screens\//.test(html), 'index.html')
-  t.absent(/assets\/screens\//.test(css), 'styles.css')
-  t.absent(fs.existsSync(path.join(PUBLIC, 'assets', 'screens')), 'no public/assets/screens/ directory')
+test('app screenshots: three WebP captures, referenced with their size, within budget', (t) => {
+  const names = ['a-rua', 'publicar', 'diario']
+  const dir = path.join(PUBLIC, 'assets', 'screens')
+  const imgs = [...html.matchAll(/<img\s[^>]*>/g)].map((m) => attrs(m[0]))
+  let total = 0
+  for (const name of names) {
+    const rel = 'assets/screens/' + name + '.webp'
+    const file = path.join(PUBLIC, rel)
+    t.ok(fs.existsSync(file), rel + ' exists')
+    if (!fs.existsSync(file)) continue
+    const tag = imgs.find((a) => a.src === rel)
+    t.ok(tag && tag.width === '603' && tag.height === '1311', 'index.html references ' + rel + ' with width 603 and height 1311')
+    const buf = fs.readFileSync(file)
+    t.ok(buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP', rel + ' is a WebP file')
+    const px = webpSize(buf)
+    t.is(px.w + 'x' + px.h, '603x1311', rel + ' is 603 x 1311 px')
+    t.ok(buf.length <= 50000, rel + ' ' + buf.length + ' <= 50000')
+    total += buf.length
+  }
+  t.ok(total <= 100000, 'the three together ' + total + ' <= 100000')
+  t.alike(fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [], names.map((n) => n + '.webp').sort(), 'no other file in public/assets/screens/')
 })
 
 test('robots.txt exists and there is no CNAME in public/', (t) => {

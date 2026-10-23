@@ -21,6 +21,7 @@ Ainda não há versões lançadas: todos os pacotes estão em `0.1.0` e nenhum f
 
 - O app ganhou o desenho da página de apresentação: três abas (A Rua, Seguindo, Diário), botão e folha de publicar, cabeçalho de perfil e ajustes.
   As funções e o protocolo são os mesmos; o desenho está em `apps/site/artwork/app-design.md`.
+- A página de apresentação mostra capturas reais do app (A Rua, Publicar e Diário) no lugar da prévia em HTML e CSS.
 
 ### Corrigido
 

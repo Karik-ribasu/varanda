@@ -31,7 +31,7 @@ Edite os arquivos em `apps/site/public` e abra um pull request. A publicação r
 
 ## Capturas e logotipo
 
-- Telas do app: a página mostra uma prévia do desenho novo do app, em HTML e CSS dentro do telefone, com conteúdo fictício (não são capturas). O desenho está em [apps/site/artwork/app-design.md](../apps/site/artwork/app-design.md). A receita para capturar o app de verdade, quando ele tiver esse desenho, está em [apps/site/artwork/screens.md](../apps/site/artwork/screens.md).
+- Telas do app: a página mostra capturas do app de verdade no simulador do iPhone (A Rua, Publicar e Diário), com conteúdo fictício, em `apps/site/public/assets/screens/`. A receita para refazê-las está em [apps/site/artwork/screens.md](../apps/site/artwork/screens.md); o desenho do app, em [apps/site/artwork/app-design.md](../apps/site/artwork/app-design.md).
 - Logotipo, ícones, abertura e favicons: gerados das SVGs em `apps/site/artwork/logo`.
 
 ```sh
