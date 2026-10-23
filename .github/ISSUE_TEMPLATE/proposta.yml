@@ -1,0 +1,37 @@
+name: Proposta
+description: Sugira uma mudança ou uma ideia nova.
+title: "[proposta] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Mudanças em formatos ou mensagens precisam atualizar docs/protocol.md ou docs/rpc.md no mesmo PR.
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema
+      description: Que dificuldade isso resolve? Para quem?
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Proposta
+      description: O que você sugere que mude.
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+  - type: dropdown
+    id: fase
+    attributes:
+      label: Fase
+      options:
+        - "Não sei"
+        - "Fase 0 — Protótipo: pendências"
+        - "Fase 1 — Piloto 18+"
+        - "Fase 2 — Ondas do canal"
+        - "Fase 3 — Menores de 16"

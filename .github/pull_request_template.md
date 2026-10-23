@@ -1,0 +1,14 @@
+## O que muda e por quê
+
+## Issue
+
+Closes #
+
+## Como verificar
+
+## Checklist
+
+- [ ] `npm run lint`, `npm test` e `npm run demo` passam
+- [ ] docs/protocol.md ou docs/rpc.md atualizados, se um formato mudou
+- [ ] Textos para o usuário estão em pt-BR
+- [ ] Nenhum segredo, chave ou dado pessoal no diff
