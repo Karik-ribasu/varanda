@@ -1,6 +1,6 @@
 # App screenshots for varanda.app
 
-> **Note (2026-10-22).** The page no longer shows these screenshots. It shows a design preview of the new app UI, drawn in HTML and CSS inside `public/index.html` and `public/styles.css` (the `.app` classes), with the design written down in [app-design.md](app-design.md). The six `.webp` files were removed from `public/assets/screens/`. The recipe below is kept for capturing the real app once it has the new design; the fictional people and posts are the same ones the preview uses.
+> **Note (2026-10-22).** The page no longer shows these screenshots. It shows a design preview of the new app UI, drawn in HTML and CSS inside `public/index.html` and `public/styles.css` (the `.app` classes), with the design written down in [app-design.md](app-design.md). The six `.webp` files were removed from `public/assets/screens/`. The app now has that design (three tabs, publish button and sheet, profile header, settings), so the recipe below is kept for capturing the real app with it; the file sizes, the environment and the screen descriptions further down are the historical inventory of the first, now removed, screenshots and say nothing about the new design; the fictional people and posts are the same ones the preview uses.
 
 The three screens on the site are screenshots of the real Varanda app: the iOS member UI on the iPhone 17 Pro simulator. They are not mockups and nothing was repainted. The people and the posts are fictional.
 
@@ -100,7 +100,7 @@ xcrun simctl install booted apps/app/ios/build/Build/Products/Debug-iphonesimula
 xcrun simctl launch booted app.varanda
 ```
 
-In the app: **Conectar** (association key, bootstrap `127.0.0.1:49800`, DHT host `127.0.0.1`). **Identidade**: "criar identidade", then `assoc certify --member <app key> ...` and paste the JSON into the certificate field, then "gravar certificado". **Perfil**: Helena Dias. **Seguindo**: the three CLI keys. **Sincronizar**: "sincronizar uma vez". **Publicar**: post 5. **A Rua**: "responder" on Bia's post, then post 6. **Sincronizar** again. Then the CLI posts 7 to 9 with `post` and `sync --once` for each member, and a third app sync.
+In the app: **Conectar** (association key, bootstrap `127.0.0.1:49800`, DHT host `127.0.0.1`). Then the standalone **Identidade** step (it shows alone until the identity and the certificate exist): "criar identidade", then `assoc certify --member <app key> ...` and paste the JSON into the certificate field, then "gravar certificado". **Diário › Editar perfil**: Helena Dias. **Seguindo**: the three CLI keys. Sync once from the sync chip (Ajustes › Sincronizar, "sincronizar uma vez"). Post 5 with the green publish button. Post 6 with "responder" on Bia's post in **A Rua**. Sync again. Then the CLI posts 7 to 9 with `post` and `sync --once` for each member, and a third app sync.
 
 Then, for each capture:
 
@@ -120,7 +120,7 @@ Finally stop Metro, the seeder and the DHT by their PIDs. A process started in t
 
 - **Accented text.** Use the simulator's paste, not typed input. With simulated typing or the tool's text paste, "ã" and "é" arrived as MacRoman mojibake ("Amanh√£"). What worked: `printf '%s' '<text>' | LC_ALL=en_US.UTF-8 xcrun simctl pbcopy booted`, then tap the field, tap it again, and choose "Paste". ASCII text (keys, certificate JSON, the name and bio) types fine. Smart quotes in the certificate JSON are handled by the app.
 - **Swallowed taps.** The first tap after typing into a field is sometimes swallowed (see docs/verification.md). Wait about a second before tapping the button, then check that it took effect. If it didn't, tap again.
-- **Tab bar.** The tab bar scrolls sideways. Swipe it to reach Diário and Sincronizar, then wait for it to settle before tapping a tab.
-- **Stale notice.** After a reply, Publicar keeps the notice "resposta publicada" while the screen stays mounted. For the Publicar shot, relaunch the app (`simctl terminate` and `launch`: it reopens on the saved config), then paste the draft. Tap an empty area above the card so the caret goes away.
+- **Tab bar.** There are three tabs (A Rua, Seguindo, Diário) and the bar no longer scrolls. Sincronizar is no longer a tab: open it from the sync chip or from Ajustes (the gear on the Diário header).
+- **Stale notice (obsolete for the new design).** After a reply, Publicar keeps the notice "resposta publicada" while the screen stays mounted. For the Publicar shot, relaunch the app (`simctl terminate` and `launch`: it reopens on the saved config), then paste the draft. Tap an empty area above the card so the caret goes away. Obsolete: the composer is now a sheet and success is a short toast in the shell, so no notice lingers; kept for history.
 - **Simulator screenshots.** The iOS Simulator tool's own screenshot can lag a step behind. Check every state with `xcrun simctl io booted screenshot`.
 - **Before you encode.** Look at each PNG: right tab, no overlay, no keyboard, 9:41 in the status bar, and none of the old test strings.

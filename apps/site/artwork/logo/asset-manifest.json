@@ -27,6 +27,14 @@
       "sha256": "d6c2eb82848fa1184f05ad422db49cefb87a93ff60b8275f84c3e7d590242b39"
     },
     {
+      "path": "apps/app/assets/cadeira.png",
+      "source": "apps/site/artwork/logo/chair.svg",
+      "width": 128,
+      "height": 128,
+      "bytes": 7897,
+      "sha256": "7f89ed3ebc0a715ebb3a449936711fdc428c2b3c1ae2c3f6a672c2139fc331cf"
+    },
+    {
       "path": "apps/app/assets/android-icon-foreground.png",
       "source": "apps/site/artwork/logo/icon-android-foreground.svg",
       "width": 512,

@@ -6,7 +6,7 @@ import { displayText } from '@varanda/rpc'
 import { useNode, useNotice } from '../node'
 import { Body, Btn, Card, ErrorText, Field, Label, Mono, Notice, Page, Soft, Title, errorText, useAction } from '../ui'
 
-export default function Identidade ({ active }) {
+export default function Identidade ({ active, embedded = false, onInfo }) {
   const node = useNode()
   const [info, setInfo] = useState(null)
   const [identity, setIdentity] = useState(null)
@@ -21,12 +21,14 @@ export default function Identidade ({ active }) {
     try {
       const i = await node.request('node.info', {})
       setInfo(i)
+      // Lets the shell know whether setup is complete (identity + certificate).
+      if (typeof onInfo === 'function') onInfo(i)
       setIdentity(i.publicKey === null ? null : await node.request('identity.show', {}))
       setLoadError('')
     } catch (err) {
       setLoadError(errorText(err))
     }
-  }, [node.request])
+  }, [node.request, onInfo])
 
   useEffect(() => { if (active) refresh() }, [active, refresh])
 
@@ -57,13 +59,13 @@ export default function Identidade ({ active }) {
 
   return (
     <Page>
-      <Title>Identidade</Title>
+      {embedded ? null : <Title>Identidade</Title>}
       <ErrorText>{loadError}</ErrorText>
       {info === null && !loadError ? <Soft>carregando…</Soft> : null}
       {info !== null && info.publicKey === null
         ? (
           <Card>
-            <Body>Você ainda não tem identidade neste nó.</Body>
+            <Body>Você ainda não tem identidade neste nó. A identidade é a chave do seu diário; crie uma para começar.</Body>
             <ErrorText>{create.error}</ErrorText>
             <Btn label='criar identidade' onPress={doCreate} pending={create.pending} />
           </Card>
@@ -80,6 +82,7 @@ export default function Identidade ({ active }) {
           </Card>
           )
         : null}
+      {info !== null && info.publicKey !== null && !info.memberCert ? <Soft>Sem o certificado, o nó não publica nem sincroniza.</Soft> : null}
       {info !== null && info.publicKey !== null && !info.memberCert
         ? (
           <Card>

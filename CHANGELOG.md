@@ -17,6 +17,11 @@ Ainda não há versões lançadas: todos os pacotes estão em `0.1.0` e nenhum f
 - Operação do semeador: `seed status`, `seed list` e `seed drop`; endpoint de saúde e métricas (`--health-port`, em `127.0.0.1` por padrão);
   imagem Docker, Compose e unidade systemd com reinício e SIGTERM; política de registros provisória. ([#34](https://github.com/Varanda-org/varanda/issues/34))
 
+### Alterado
+
+- O app ganhou o desenho da página de apresentação: três abas (A Rua, Seguindo, Diário), botão e folha de publicar, cabeçalho de perfil e ajustes.
+  As funções e o protocolo são os mesmos; o desenho está em `apps/site/artwork/app-design.md`.
+
 ### Corrigido
 
 - Um lock do diretório de dados com o pid do próprio processo, deixado por um processo morto que tinha o mesmo pid

@@ -10,7 +10,7 @@ import { checkForm, formOf } from '../config'
 import { useNode } from '../node'
 import { Body, Btn, Card, ErrorText, Field, Label, Mono, Notice, Page, Row, Soft, Title, errorText, useAction } from '../ui'
 
-export default function Conexao ({ active = true }) {
+export default function Conexao ({ active = true, embedded = false }) {
   const node = useNode()
   const [form, setForm] = useState(() => formOf(node.config))
   const [localError, setLocalError] = useState('')
@@ -45,7 +45,7 @@ export default function Conexao ({ active = true }) {
   if (!node.canConfigure) {
     return (
       <Page>
-        <Title>Conexão</Title>
+        {embedded ? null : <Title>Conexão</Title>}
         <Card>
           <Label>estado</Label>
           <Body>{{ ready: 'conectado ao varanda-serve', connecting: 'conectando…', loading: 'conectando…' }[node.phase] || 'desconectado'}</Body>
@@ -62,7 +62,7 @@ export default function Conexao ({ active = true }) {
   const busy = node.phase === 'connecting' || node.phase === 'loading' || apply.pending
   return (
     <Page>
-      <Title>{ready ? 'Conexão' : 'Conectar'}</Title>
+      {embedded ? null : <Title>{ready ? 'Conexão' : 'Conectar'}</Title>}
       {!ready ? <Soft>Informe a associação e como achar outros aparelhos. Nada aqui é segredo: as chaves ficam dentro do app.</Soft> : null}
       {busy ? <Notice>conectando…</Notice> : null}
       <ErrorText>{node.error || apply.error || infoError}</ErrorText>
