@@ -17,7 +17,10 @@ const { openStore, openDiary, appendRecord, writeConfig } = require('../lib/stor
 const { memberCertRecord, profileRecord, postRecord } = require('../lib/records')
 const { runSync } = require('../lib/sync')
 
-const BARE = path.resolve(__dirname, '..', '..', '..', 'node_modules', '.bin', 'bare')
+// The launcher inside bare-runtime, not node_modules/.bin/bare: the platform
+// packages (bare-runtime-<os>-<arch>) declare the same `bare` bin, and npm 10
+// (bundled with Node 20) then links neither, so .bin/bare does not exist.
+const BARE = path.join(path.dirname(require.resolve('bare-runtime/package')), 'bin', 'bare')
 const SMOKE = path.join(__dirname, 'bare', 'smoke.js')
 
 async function testnet (t, size = 3) {
