@@ -426,9 +426,9 @@ test('data-dir lock: a held dir is LOCKED, close releases it', async (t) => {
   t.ok(fs.existsSync(lockDir(dir)))
   await s2.closeOnce()
 
-  // a live owner (here: this process) on a fresh dir: LOCKED, store untouched
+  // a live owner (here: the parent process) on a fresh dir: LOCKED, store untouched
   const fresh = tmpDir(t)
-  plantLock(fresh, String(process.pid) + '\n')
+  plantLock(fresh, String(process.ppid) + '\n')
   await t.exception(() => store.openStore(fresh), /diretório de dados em uso/)
   t.absent(fs.existsSync(path.join(fresh, 'store')), 'store dir never created')
   t.ok(fs.existsSync(lockDir(fresh)), 'a live lock is never removed')
@@ -458,6 +458,48 @@ test('data-dir lock: a stale lock (dead pid, or old garbage) is taken over', asy
   t.is(ownerPid(empty), process.pid)
   t.alike(leftovers(empty), [])
   await s3.closeOnce()
+})
+
+test('data-dir lock: our own pid with a token we do not hold is stale (restarted container)', async (t) => {
+  await testnet(t)
+  // A container restarts its process with the same pid (1): the lock the
+  // killed run left carries our pid but not one of our tokens.
+  for (const owner of [process.pid + ' ' + 'e'.repeat(32) + '\n', String(process.pid) + '\n']) {
+    const dir = tmpDir(t)
+    plantLock(dir, owner)
+    t.ok(store.lockHeld(dir) === false, 'probe: not held')
+    const s = await open(t, dir)
+    t.is(ownerPid(dir), process.pid)
+    t.alike(leftovers(dir), [], 'no stale copy left')
+    // ...while a lock this process does hold stays LOCKED for a second opener
+    t.ok(store.lockHeld(dir), 'probe: held by this process')
+    await t.exception(() => store.openStore(dir), /diretório de dados em uso/)
+    await s.closeOnce()
+  }
+})
+
+test('data-dir lock: lockHeld probes without creating, taking over or removing', async (t) => {
+  await testnet(t)
+  const dir = tmpDir(t)
+  t.is(store.lockHeld(dir), false, 'no lock')
+  t.is(store.lockHeld(path.join(dir, 'missing')), false, 'no data dir')
+  t.alike(fs.readdirSync(dir), [], 'nothing created')
+
+  plantLock(dir, String(process.ppid) + '\n')
+  t.is(store.lockHeld(dir), true, 'live owner')
+  plantLock(dir, String(deadPid()) + '\n')
+  t.is(store.lockHeld(dir), false, 'dead owner')
+  t.ok(fs.existsSync(lockDir(dir)), 'a stale lock is left in place')
+
+  const empty = tmpDir(t)
+  fs.mkdirSync(lockDir(empty))
+  t.is(store.lockHeld(empty), true, 'a young owner-less lock counts as held')
+  age(lockDir(empty))
+  t.is(store.lockHeld(empty), false, 'an old owner-less lock is stale')
+
+  const file = tmpDir(t)
+  fs.writeFileSync(lockDir(file), 'x')
+  t.exception(() => store.lockHeld(file), /lock inválido/)
 })
 
 test('data-dir lock: a fresh pid-less lock is not taken over', async (t) => {

@@ -24,8 +24,10 @@ Comandos:
   log                        mostra os blocos locais de um diário
   feed                       feed com as publicações dos diários seguidos
   sync                       sincroniza com pares e com o semeador (--once, --timeout-ms)
-  seed                       semeador sempre ligado
+  seed                       semeador sempre ligado (--health-port)
   seed key|cert add          chave do semeador e seu certificado (--cert-file)
+  seed list|status           diários admitidos e estado do semeador
+  seed drop <chave>          apaga um diário do semeador parado
   help                       esta ajuda
 Opções globais:
   --data <dir>               diretório de dados (ou VARANDA_DATA, padrão ./data)
@@ -35,7 +37,7 @@ Opções globais:
   --json                     saída JSON na última linha
 Opções dos comandos:
   --member --seeder --age-band --method --out --cert-file --name --bio --text
-  --to --author --limit --once --timeout-ms`
+  --to --author --limit --once --timeout-ms --health-port --health-host`
 
 function parse (argv = [], env = {}) {
   return parseArgs(argv, env, root)
@@ -55,7 +57,7 @@ function usage (t, argv, message, env = {}) {
 
 function spawn (argv, extraEnv = {}) {
   const env = { ...process.env }
-  for (const name of ['VARANDA_DATA', 'VARANDA_ASSOCIATION', 'VARANDA_BOOTSTRAP', 'VARANDA_DHT_HOST']) delete env[name]
+  for (const name of ['VARANDA_DATA', 'VARANDA_ASSOCIATION', 'VARANDA_BOOTSTRAP', 'VARANDA_DHT_HOST', 'VARANDA_HEALTH_PORT', 'VARANDA_HEALTH_HOST']) delete env[name]
   return spawnSync(process.execPath, [bin, ...argv], {
     cwd: root,
     env: { ...env, ...extraEnv },
@@ -111,6 +113,8 @@ test('CLI parser, R5 help and command router', async (t) => {
     member: null,
     seeder: null,
     dhtHost: null,
+    healthPort: null,
+    healthHost: null,
     ageBand: null,
     method: null,
     out: null,
@@ -125,7 +129,7 @@ test('CLI parser, R5 help and command router', async (t) => {
   })
   t.alike(parseArgs([]), parseArgs([], process.env, process.cwd()), 'default env and cwd')
   t.alike(parse(['--json', 'seed', 'cert', '--once', 'add']).positionals, ['cert', 'add'])
-  for (const [command, positionals] of [['seed', ['key']], ['seed', ['cert', 'add']], ['assoc', ['certify-seeder']]]) {
+  for (const [command, positionals] of [['seed', ['key']], ['seed', ['cert', 'add']], ['seed', ['drop', upperKey]], ['assoc', ['certify-seeder']]]) {
     const flags = parse([command, ...positionals])
     t.is(flags.command, command)
     t.alike(flags.positionals, positionals)
@@ -150,7 +154,9 @@ test('CLI parser, R5 help and command router', async (t) => {
     to: [upperKey + ':2', 'to', { author: lowerKey, seq: 2 }],
     author: [upperKey, 'author', lowerKey],
     limit: ['3', 'limit', 3],
-    'dht-host': ['127.0.0.1', 'dhtHost', '127.0.0.1']
+    'dht-host': ['127.0.0.1', 'dhtHost', '127.0.0.1'],
+    'health-port': ['8788', 'healthPort', 8788],
+    'health-host': ['0.0.0.0', 'healthHost', '0.0.0.0']
   }
   for (const [name, [value, property, expected]] of Object.entries(strings)) {
     const flag = '--' + name
@@ -217,6 +223,20 @@ test('CLI parser, R5 help and command router', async (t) => {
   for (const host of ['', ' ', '127.0.0.1 ', 'local host', 'local\thost', 'local\nhost']) {
     usage(t, ['--dht-host', host], 'dht-host inválido')
     usage(t, [], 'dht-host inválido', { VARANDA_DHT_HOST: host })
+  }
+  t.is(parse(['--health-port', '0']).healthPort, 0, 'port 0: the system picks one')
+  t.is(parse(['--health-port', '65535']).healthPort, 65535)
+  t.is(parse([], { VARANDA_HEALTH_PORT: '8788' }).healthPort, 8788)
+  t.is(parse(['--health-port', '9000'], { VARANDA_HEALTH_PORT: 'bad' }).healthPort, 9000)
+  for (const value of ['', '-1', '65536', '080', '1.5', 'abc', '1e3', '0x10', ' 1']) {
+    usage(t, ['--health-port', value], 'health-port inválido')
+    usage(t, [], 'health-port inválido', { VARANDA_HEALTH_PORT: value })
+  }
+  t.is(parse([], { VARANDA_HEALTH_HOST: '::1' }).healthHost, '::1')
+  t.is(parse(['--health-host', '127.0.0.1'], { VARANDA_HEALTH_HOST: 'invalid host' }).healthHost, '127.0.0.1')
+  for (const host of ['', ' ', 'local host', 'local\nhost']) {
+    usage(t, ['--health-host', host], 'health-host inválido')
+    usage(t, [], 'health-host inválido', { VARANDA_HEALTH_HOST: host })
   }
   for (const name of ['timeout-ms', 'limit']) {
     for (const value of ['0', '-1', '1.5', 'abc', '', 'Infinity', '1e3', '0x10']) usage(t, ['--' + name, value])

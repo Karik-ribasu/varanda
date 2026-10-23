@@ -29,6 +29,7 @@ const {
 } = require('./net')
 const {
   openStore,
+  lockHeld,
   openReplica,
   openQuarantine,
   removeQuarantine,
@@ -90,6 +91,33 @@ async function localVerdict (core, keyHex, associationHex) {
   } catch {
     return 'not-in-log'
   }
+}
+
+function givenAssociation (associationKey) {
+  if (associationKey === null || associationKey === undefined) return null
+  const given = normalizeHex(associationKey)
+  if (given === null || given.length !== 64) throw new UsageError('chave da associação inválida')
+  return given
+}
+
+function configuredAssociation (config, given) {
+  if (!isPlainObject(config) || config.role !== 'seeder') throw new Error('diretório não é de um semeador')
+  if (typeof config.association !== 'string' || !HEX64.test(config.association)) {
+    throw new Error('diretório não é de um semeador')
+  }
+  if (given !== null && given !== config.association) throw new Error('associação diferente da configurada')
+  return config.association
+}
+
+// admitted.json as the operator commands read it: the listed entries (any
+// key; the caller filters hex64), never throwing on a malformed shape.
+function readAdmitted (dataDir) {
+  const data = readJson(path.join(dataDir, ADMITTED_FILE), { v: 1, admitted: {} })
+  return isPlainObject(data) && isPlainObject(data.admitted) ? data.admitted : {}
+}
+
+function storedCore (store, key) {
+  return store.storage.hasCore(crypto.discoveryKey(b4a.from(key, 'hex')))
 }
 
 function loadSeederKey (dataDir) {
@@ -182,6 +210,7 @@ class Seeder {
     this._keyPair = null
     this._cert = null
     this._started = false
+    this._ready = false
     this._closing = null
     this._stopRediscovery = null
     this.closed = new Promise((resolve) => { this._resolveClosed = resolve })
@@ -190,24 +219,100 @@ class Seeder {
   // Shared by `seed key`, `seed cert add` and `seed`: the first of them fixes
   // the seeder's trust root in config.json.
   static ensureConfig (dataDir, associationKey) {
-    let given = null
-    if (associationKey !== null && associationKey !== undefined) {
-      given = normalizeHex(associationKey)
-      if (given === null || given.length !== 64) throw new UsageError('chave da associação inválida')
-    }
+    const given = givenAssociation(associationKey)
     const config = readConfig(dataDir)
-    if (config !== null) {
-      if (!isPlainObject(config) || config.role !== 'seeder') throw new Error('diretório não é de um semeador')
-      if (typeof config.association !== 'string' || !HEX64.test(config.association)) {
-        throw new Error('diretório não é de um semeador')
-      }
-      if (given !== null && given !== config.association) throw new Error('associação diferente da configurada')
-      return config.association
-    }
+    if (config !== null) return configuredAssociation(config, given)
     if (given === null) throw new UsageError('informe --association ou VARANDA_ASSOCIATION')
     fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 })
     writeConfig(dataDir, { v: 1, role: 'seeder', association: given })
     return given
+  }
+
+  // The read-only twin of ensureConfig, for the operator commands (`seed
+  // status`, `seed list`, `seed drop`): they never write config.json, so a
+  // missing one is not a seeder dir.
+  static checkConfig (dataDir, associationKey) {
+    const given = givenAssociation(associationKey)
+    const config = readConfig(dataDir)
+    if (config === null) throw new Error('diretório não é de um semeador')
+    return configuredAssociation(config, given)
+  }
+
+  // `seed status`: what a start would find, read without the data-dir lock
+  // and without opening a store, so it also answers while `seed` runs and
+  // writes nothing. `certificate` is 'ok', 'missing' or the reason of
+  // seederCertForKey; `running` is whether a live process holds the lock.
+  static status (dataDir, associationKey) {
+    const association = Seeder.checkConfig(dataDir, associationKey)
+    let publicKey = null
+    try {
+      publicKey = b4a.toString(loadKeyPairFile(path.join(dataDir, KEY_FILE)).publicKey, 'hex')
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err
+    }
+    let certificate
+    try {
+      const cert = readJson(path.join(dataDir, CERT_FILE), null)
+      certificate = cert === null ? 'missing' : seederCertForKey(cert, publicKey, association).reason || 'ok'
+    } catch {
+      certificate = 'malformed'
+    }
+    const admitted = Object.keys(readAdmitted(dataDir)).filter((key) => HEX64.test(key)).length
+    return { association, publicKey, certificate, admitted, running: lockHeld(dataDir) }
+  }
+
+  // `seed list`: the admitted logs and their signed sizes. It takes the
+  // data-dir lock (opens the main store) before reading admitted.json, as
+  // start() does, so it runs only while the seeder is stopped. A listed key
+  // with no stored core is reported empty and never opened: listing creates
+  // no core in the main store.
+  static async list (dataDir, associationKey) {
+    Seeder.checkConfig(dataDir, associationKey)
+    const store = await openStore(dataDir)
+    try {
+      const admitted = []
+      for (const key of Object.keys(readAdmitted(dataDir))) {
+        if (!HEX64.test(key)) continue
+        const entry = { key, length: 0, byteLength: 0 }
+        if (await storedCore(store, key)) {
+          const core = await openReplica(store, key)
+          entry.length = core.length
+          entry.byteLength = core.byteLength
+          await core.close()
+        }
+        admitted.push(entry)
+      }
+      return { admitted }
+    } finally {
+      await store.close()
+    }
+  }
+
+  // `seed drop <key>`: removes one log while the seeder is stopped (under
+  // the data-dir lock), in the startup-drop order of R6.1: the replica is
+  // purged FIRST, and only then the key leaves admitted.json, so every core
+  // in the main store stays listed. A purge failure throws and leaves the
+  // file untouched. It is not a block: the author's next announce runs the
+  // full gate again (moderation lists are phase 2).
+  static async drop (dataDir, associationKey, key) {
+    Seeder.checkConfig(dataDir, associationKey)
+    if (typeof key !== 'string' || !HEX64.test(key)) throw new UsageError('chave inválida')
+    const store = await openStore(dataDir)
+    try {
+      const admitted = readAdmitted(dataDir)
+      const listed = Object.prototype.hasOwnProperty.call(admitted, key)
+      const stored = await storedCore(store, key)
+      if (!listed && !stored) throw new Error('diário não está no semeador')
+      if (stored) await purgeReplica(store, key)
+      if (listed) {
+        const rest = {}
+        for (const [k, cert] of Object.entries(admitted)) if (k !== key) rest[k] = cert
+        writeJsonAtomic(path.join(dataDir, ADMITTED_FILE), { v: 1, admitted: rest })
+      }
+      return { key }
+    } finally {
+      await store.close()
+    }
   }
 
   // Idempotent: an existing key file is returned as is (never overwritten).
@@ -264,9 +369,7 @@ class Seeder {
 
     try {
       if (this.storeHook) await this.storeHook()
-      const data = readJson(path.join(this.dataDir, ADMITTED_FILE), { v: 1, admitted: {} })
-      const listed = isPlainObject(data) && isPlainObject(data.admitted) ? data.admitted : {}
-      for (const [key, cert] of Object.entries(listed)) {
+      for (const [key, cert] of Object.entries(readAdmitted(this.dataDir))) {
         if (HEX64.test(key)) this._admitted.set(key, cert)
       }
       this.qstore = await openQuarantine(this.dataDir)
@@ -323,8 +426,31 @@ class Seeder {
 
     const topic = b4a.toString(this.topic, 'hex')
     const admitted = this.admittedKeys()
+    this._ready = true
     this.log({ event: 'ready', topic, admitted })
     return { topic, admitted }
+  }
+
+  // Aggregate state for the health endpoint: counts and sizes only, never a
+  // key, a certificate, an address or a block. status is 'starting' until
+  // start() completes, 'ok' while serving and 'closing' from close() on.
+  stats () {
+    let blocks = 0
+    let bytes = 0
+    for (const entry of this._served.values()) {
+      blocks += entry.core.contiguousLength
+      bytes += entry.core.byteLength
+    }
+    return {
+      status: this._closing ? 'closing' : (this._ready ? 'ok' : 'starting'),
+      admitted: this._admitted.size,
+      dropping: this._dropping.size,
+      blocks,
+      bytes,
+      connections: this.swarm ? this.swarm.connections.size : 0,
+      peers: this._peers.size,
+      firewalled: this.swarm ? this.swarm.dht.firewalled : null
+    }
   }
 
   // TODO(phase2): moderation lists — consult a block list before admitting.
@@ -620,7 +746,7 @@ class Seeder {
 
   // Whether the main store's storage holds a core for key (never opens one).
   _stored (key) {
-    return this.store.storage.hasCore(crypto.discoveryKey(b4a.from(key, 'hex')))
+    return storedCore(this.store, key)
   }
 
   async _purge (key) {

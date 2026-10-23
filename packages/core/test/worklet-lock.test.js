@@ -144,7 +144,7 @@ test('invalid lock value is refused before touching the disk', async (t) => {
   t.absent(fs.existsSync(dir), 'the data dir was never created')
 })
 
-test('posix (default) is unchanged: held -> LOCKED, dead pid taken over, kill probed', async (t) => {
+test('posix (default): held -> LOCKED, dead pid taken over, kill probed', async (t) => {
   const kills = spyKill(t)
   const dir = tmpDir(t)
   for (const opts of [undefined, {}, { lock: 'posix' }]) {
@@ -153,9 +153,9 @@ test('posix (default) is unchanged: held -> LOCKED, dead pid taken over, kill pr
     t.is(await codeOf(store.openStore(dir, { lock: 'worklet' })), 'LOCKED', 'a worklet opener sees the posix lock')
     await s.closeOnce()
   }
-  t.ok(kills.length > 0, 'posix probes the owner pid')
-  t.ok(kills.every(([pid, sig]) => pid === process.pid && sig === 0))
-  kills.length = 0
+  // Our own pid is live only with a token this process holds: decided by
+  // the token, without a probe.
+  t.alike(kills, [], 'a lock this process holds needs no probe')
   // A dead pid is stale at once in posix mode.
   let dead = 2 ** 22 - 1
   while (await codeOf(Promise.resolve().then(() => process.kill(dead, 0))) === null) dead--
@@ -167,9 +167,19 @@ test('posix (default) is unchanged: held -> LOCKED, dead pid taken over, kill pr
   t.is(Number(owner.split(' ')[0]), process.pid)
   await s.closeOnce()
   // recover is a worklet-only option: posix ignores it and still probes.
-  plantForeignLock(dir, process.pid)
+  kills.length = 0
+  plantForeignLock(dir, process.ppid)
   t.is(await codeOf(store.openStore(dir, { lock: 'posix', recover: true })), 'LOCKED')
+  t.alike(kills, [[process.ppid, 0]], 'a foreign live pid is probed')
   fs.rmSync(path.join(dir, '.varanda-lock'), { recursive: true, force: true })
+  // Our own pid with a token this process does not hold was written by a
+  // dead process with the same pid (a restarted container): stale at once.
+  kills.length = 0
+  plantForeignLock(dir, process.pid)
+  const again = await open(t, dir)
+  t.alike(kills, [], 'no probe for our own pid')
+  t.is(Number(fs.readFileSync(path.join(dir, '.varanda-lock', 'pid'), 'utf8').split(' ')[0]), process.pid)
+  await again.closeOnce()
 })
 
 test('suspend reaches Corestore in openStore and openQuarantine', async (t) => {
