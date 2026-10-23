@@ -10,7 +10,7 @@
 | [development.md](development.md) | inglês | Como desenvolver: pré-requisitos, workspaces, instalação, lint, testes, demo, `varanda-serve`, build do iOS, Android, teste do Bare. |
 | [app.md](app.md) | pt-BR | O que o aplicativo faz hoje, as telas, o nó no app contra o cliente web, o que ficou fora do piloto. |
 | [ios-gate.md](ios-gate.md) | inglês | A prova de que o nó real roda no worklet Bare do app no simulador iOS: como é montado, os passos, a evidência e os riscos restantes. |
-| [verification.md](verification.md) | inglês | A verificação de ponta a ponta do monorepo: CLI, navegador pelo `varanda-serve` e simulador iOS sincronizando entre si, as checagens de vazamento, o que não foi verificado e as correções da auditoria de segurança. |
+| [verification.md](verification.md) | inglês | A verificação de ponta a ponta do monorepo: CLI, navegador pelo `varanda-serve` e simulador iOS sincronizando entre si, a DHT pública, as checagens de vazamento, o que não foi verificado e as correções da auditoria de segurança. |
 | [site.md](site.md) | pt-BR | O site estático (varanda.app): como ver, atualizar e publicar na GitHub Pages, os passos de domínio e DNS que só o usuário faz, e a verificação depois de publicar. |
 
 O README da raiz ([../README.md](../README.md)) descreve o programa de linha de comando e o `varanda-serve`.
