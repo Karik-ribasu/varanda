@@ -79,6 +79,15 @@ function pidAlive (pid) {
   }
 }
 
+// Whether a lock is held by a live owner. Our own pid is live only with a
+// token this process holds: our pid with any other token (or none) was
+// written by a dead process that had the same pid, e.g. the previous run of
+// a restarted container, where the seeder is pid 1 every time.
+function liveOwner (info) {
+  if (info.pid === process.pid) return info.token !== null && [...heldLocks.values()].includes(info.token)
+  return pidAlive(info.pid)
+}
+
 // The owner file holds `<pid> <token>` (token: 32 random hex). A bare pid
 // (older format) still names a live or dead owner, without a token.
 function parseOwner (raw) {
@@ -216,8 +225,9 @@ function takeOverLock (lockDir, stale, token) {
 }
 
 // Exclusive data-dir lock: an atomic mkdir of <dataDir>/.varanda-lock holding
-// `<pid> <token>`. A live owner (this process included) means LOCKED; a dead
-// owner (or another user's pid) is taken over; a missing or garbage owner is
+// `<pid> <token>`. A live owner (this process included, when the token is one
+// it holds) means LOCKED; a dead owner (or another user's pid, or our own pid
+// with a token we do not hold) is taken over; a missing or garbage owner is
 // taken over only once the lock dir's mtime is LOCK_GRACE_MS in the past (or
 // more than LOCK_GRACE_MS in the future: clock skew), else LOCKED after
 // LOCK_WAIT_MS. A lock path that is not a real directory is LOCK_INVALID at
@@ -253,7 +263,7 @@ async function acquireLock (dataDir, { lock, recover }) {
         if (!takeOverLock(lockDir, info, token)) await sleep(20)
         continue
       }
-      if (info.pid !== null && pidAlive(info.pid)) throw lockedError()
+      if (info.pid !== null && liveOwner(info)) throw lockedError()
       const age = Date.now() - info.mtimeMs
       if (info.pid === null && age < LOCK_GRACE_MS && age > -LOCK_GRACE_MS) {
         if (Date.now() >= waitUntil) throw lockedError()
@@ -331,6 +341,19 @@ async function openStore (dataDir, { lock = 'posix', recover = false, suspend } 
     return result
   }
   return store
+}
+
+// Read-only probe for status commands: whether a live process holds the
+// data-dir lock, by the same rules acquireLock applies (an owner-less lock
+// still inside its grace period counts as held). It never creates, takes
+// over or removes anything; a lock path that is not a real directory throws
+// LOCK_INVALID as on open.
+function lockHeld (dataDir) {
+  const info = inspectLock(path.join(dataDir, LOCK_DIR))
+  if (info === null) return false
+  if (info.pid !== null) return liveOwner(info)
+  const age = Date.now() - info.mtimeMs
+  return age < LOCK_GRACE_MS && age > -LOCK_GRACE_MS
 }
 
 function storeExists (dataDir) {
@@ -537,6 +560,7 @@ function writeFollows (dataDir, list) {
 
 module.exports = {
   openStore,
+  lockHeld,
   storeExists,
   openDiary,
   openReplica,

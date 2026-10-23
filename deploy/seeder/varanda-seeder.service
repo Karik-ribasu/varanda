@@ -1,0 +1,58 @@
+# Semeador Varanda como serviço systemd.
+#
+# Supõe o código em /opt/varanda (com `npm ci --omit=dev --workspace apps/cli`),
+# o usuário de sistema varanda e o Node em /usr/bin/node (ajuste ExecStart se
+# ele estiver em outro lugar). Variáveis opcionais em /etc/varanda/seeder.env
+# (modelo: seeder.env.example). Passo a passo no README, seção "Operar o
+# semeador". Depois de copiar para /etc/systemd/system/:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now varanda-seeder
+#   curl -s http://127.0.0.1:8788/health
+#   journalctl -u varanda-seeder -f
+
+[Unit]
+Description=Semeador Varanda
+Documentation=https://github.com/Varanda-org/varanda#operar-o-semeador
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=varanda
+Group=varanda
+WorkingDirectory=/opt/varanda
+Environment=NODE_ENV=production
+Environment=VARANDA_DATA=/var/lib/varanda/seeder
+Environment=VARANDA_HEALTH_PORT=8788
+EnvironmentFile=-/etc/varanda/seeder.env
+ExecStart=/usr/bin/node /opt/varanda/apps/cli/bin/varanda.js seed --json
+
+# SIGTERM fecha o semeador (store, quarentena e lock) e ele sai com 0. Uma
+# falha (código 1, por exemplo uma limpeza que falhou) reinicia em 5 s; erro
+# de uso (código 2, configuração errada) não reinicia.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=2
+
+# Saída padrão e erros vão para o journal (política de registros no README).
+StandardOutput=journal
+StandardError=journal
+
+StateDirectory=varanda
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
