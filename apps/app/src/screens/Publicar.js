@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { MAX_TEXT, displayText } from '@varanda/rpc'
-import { useNode } from '../node'
+import { useNode, useNotice } from '../node'
 import { Body, Btn, Card, ErrorText, Field, Notice, Page, Row, Soft, Title, useAction } from '../ui'
 
 const count = (s) => Array.from(s).length
@@ -10,7 +10,9 @@ const count = (s) => Array.from(s).length
 export default function Publicar ({ reply, onClearReply }) {
   const node = useNode()
   const [text, setText] = useState('')
-  const [done, setDone] = useState('')
+  // Belongs to the post being answered (null: a new post), so choosing or
+  // cancelling a reply clears it.
+  const [done, setDone] = useNotice(reply ? reply.ref : null)
   const action = useAction()
   const replyRef = useRef(reply)
   replyRef.current = reply
@@ -29,8 +31,11 @@ export default function Publicar ({ reply, onClearReply }) {
       // Only what was sent is cleared: an edit made while the request was
       // pending stays.
       setText((current) => (current === sent ? '' : current))
-      setDone(sentReply ? 'resposta publicada' : 'publicado')
-      if (sentReply && replyRef.current && replyRef.current.ref === sentReply.ref) onClearReply()
+      const cleared = sentReply && replyRef.current && replyRef.current.ref === sentReply.ref
+      // Noted for the screen as it is next: back to a new post once the
+      // answered post is cleared.
+      setDone(sentReply ? 'resposta publicada' : 'publicado', sentReply && !cleared ? sentReply.ref : null)
+      if (cleared) onClearReply()
     }
   }
 

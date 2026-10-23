@@ -18,3 +18,5 @@ Ainda não há versões lançadas: todos os pacotes estão em `0.1.0` e nenhum f
 ### Corrigido
 
 - Liberação de referências a sockets fechados nas buscas em quarentena. ([#2](https://github.com/Varanda-org/varanda/pull/2))
+- DHT pública com endereço local de loopback: o app e a sessão do nó recusam a combinação, que só terminava em tempo esgotado.
+  Avisos de tela somem quando o nó encerra, quando a sincronização termina ou quando a resposta muda. ([#10](https://github.com/Varanda-org/varanda/issues/10))

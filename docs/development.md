@@ -65,7 +65,7 @@ One file, from the repo root:
 node apps/cli/test/serve.test.js
 ```
 
-`apps/app` has no test script. Network tests use an in-process local DHT bound to `127.0.0.1`. No test uses the public DHT.
+`apps/app` tests only the form rules of `src/config.js` (`apps/app/test/config.test.js`; the module is loaded with `import()` through Node's module syntax detection, which prints a `MODULE_TYPELESS_PACKAGE_JSON` warning). The screens have no automated tests. Network tests use an in-process local DHT bound to `127.0.0.1`. No test uses the public DHT.
 
 ### Bare desktop smoke test
 

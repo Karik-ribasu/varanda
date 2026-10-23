@@ -14,6 +14,15 @@ export function validBootstrap (entry) {
   return String(port) === match[2] && Number.isSafeInteger(port) && port >= 1 && port <= 65535
 }
 
+// 'localhost', 127.0.0.0/8 or ::1 (packages/core/lib/config.js
+// isLoopbackAddress).
+export function isLoopbackAddress (host) {
+  const text = String(host).toLowerCase()
+  if (text === 'localhost' || text === '::1' || text === '[::1]') return true
+  const m = /^127\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$/.exec(text)
+  return m !== null && m.slice(1).every((octet) => Number(octet) <= 255)
+}
+
 export function parseBootstrapText (text) {
   return String(text).split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0)
 }
@@ -33,6 +42,10 @@ export function checkForm (form) {
   if (!publicDht && list.length === 0) return { error: 'informe ao menos um bootstrap ou ligue a DHT pública' }
   const host = String(form.dhtHost || '').trim()
   if (/\s/.test(host)) return { error: 'endereço da DHT inválido' }
+  // A DHT bound to loopback never reaches a public peer (issue #10).
+  if (publicDht && host !== '' && isLoopbackAddress(host)) {
+    return { error: 'com a DHT pública, apague o endereço local da DHT: ' + host + ' só alcança este aparelho' }
+  }
   return {
     config: {
       association: association.toLowerCase(),
@@ -58,11 +71,15 @@ export function formOf (config) {
 // A stored value is only trusted after the same check (a hand-edited file).
 export function revive (value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return null
+  const publicDht = value.allowPublicDht === true
+  const host = typeof value.dhtHost === 'string' ? value.dhtHost : ''
   const checked = checkForm({
     association: value.association,
     bootstrapText: Array.isArray(value.bootstrap) ? value.bootstrap.filter((e) => typeof e === 'string').join('\n') : '',
-    publicDht: value.allowPublicDht === true,
-    dhtHost: typeof value.dhtHost === 'string' ? value.dhtHost : ''
+    publicDht,
+    // Saved before the loopback check: that host only kept the node off the
+    // public DHT, so it is dropped rather than the whole configuration.
+    dhtHost: publicDht && isLoopbackAddress(host.trim()) ? '' : host
   })
   return checked.config || null
 }

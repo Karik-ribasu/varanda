@@ -2,9 +2,8 @@
 // the node's events (kept by the provider, keyed by runId) and the last 200
 // event and warning lines.
 
-import { useState } from 'react'
 import { displayText } from '@varanda/rpc'
-import { useNode } from '../node'
+import { useNode, useNotice } from '../node'
 import { Body, Btn, Card, ErrorText, Mono, Notice, Page, Row, Soft, Title, useAction } from '../ui'
 
 const REASONS = {
@@ -18,7 +17,9 @@ const REASONS = {
 export default function Sincronizar () {
   const node = useNode()
   const { sync } = node
-  const [note, setNote] = useState('')
+  // "iniciada" lasts as long as that run; "nenhuma ... em andamento" until
+  // a run starts.
+  const [note, setNote] = useNotice(sync.active !== null ? sync.active.runId : null)
   const start = useAction()
   const stop = useAction()
 
@@ -27,13 +28,13 @@ export default function Sincronizar () {
     // Never resent: after an uncertain failure the state below (events) and
     // sync.status are what the person checks first.
     const r = await start.run(() => node.request('sync.start', once ? { once: true } : {}))
-    if (r.ok) setNote(once ? 'sincronização única iniciada' : 'sincronização contínua iniciada')
+    if (r.ok) setNote(once ? 'sincronização única iniciada' : 'sincronização contínua iniciada', r.value.runId)
   }
 
   const doStop = async () => {
     setNote('')
     const r = await stop.run(() => node.request('sync.stop', {}))
-    if (r.ok && !r.value.stopped) setNote('nenhuma sincronização em andamento')
+    if (r.ok && !r.value.stopped) setNote('nenhuma sincronização em andamento', null)
   }
 
   const running = sync.active !== null

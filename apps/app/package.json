@@ -12,7 +12,8 @@
     "web": "expo start --web",
     "link:addons": "bash scripts/link-addons.sh",
     "pack:worklet": "bash scripts/pack-worklet.sh",
-    "gate": "node scripts/gate-server.js"
+    "gate": "node scripts/gate-server.js",
+    "test": "node ../../scripts/run-tests.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "55.0.12",

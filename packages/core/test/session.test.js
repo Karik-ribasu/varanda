@@ -79,6 +79,10 @@ test('config: association, member dir, bootstrap and public DHT', (t) => {
   throwsUsage(t, () => createSession({ ...base, dhtHost: '' }), 'dht-host inválido')
   throwsUsage(t, () => createSession({ ...base, dhtHost: 'a b' }), 'dht-host inválido')
   t.ok(createSession({ ...base, bootstrap: null, allowPublicDht: true }), 'public DHT only when asked for')
+  // A DHT bound to loopback never reaches a public peer (issue #10).
+  for (const dhtHost of ['127.0.0.1', '127.8.9.10', 'localhost', 'LOCALHOST', '::1', '[::1]']) {
+    throwsUsage(t, () => createSession({ ...base, bootstrap: null, allowPublicDht: true, dhtHost }), 'dht-host de loopback e DHT pública são exclusivos')
+  }
 
   // Loopback bootstrap implies the loopback DHT host (V7).
   const cfg = (over) => checkConfig({ ...base, allowPublicDht: false, dhtHost: null, ...over })
@@ -87,6 +91,8 @@ test('config: association, member dir, bootstrap and public DHT', (t) => {
   t.is(cfg({ bootstrap: ['127.0.0.300:1'] }).dhtHost, null, 'not an IPv4 address')
   t.is(cfg({ bootstrap: ['127.0.0.1:1'], dhtHost: '192.168.1.5' }).dhtHost, '192.168.1.5', 'an explicit host is kept')
   t.is(cfg({ bootstrap: null, allowPublicDht: true }).dhtHost, null)
+  t.is(cfg({ bootstrap: null, allowPublicDht: true, dhtHost: '192.168.1.5' }).dhtHost, '192.168.1.5', 'public DHT: a host that is not loopback is kept')
+  t.is(cfg({ bootstrap: ['127.0.0.1:1'], dhtHost: '127.0.0.1' }).dhtHost, '127.0.0.1', 'private bootstrap: a loopback host is kept')
   t.alike(cfg({ bootstrap: ['a.example:5'] }).bootstrap, ['a.example:5'])
 })
 

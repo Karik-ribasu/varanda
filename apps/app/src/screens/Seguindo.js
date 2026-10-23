@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { FOLLOW_LIMIT_MAX, displayText, isKey } from '@varanda/rpc'
-import { useNode } from '../node'
+import { useNode, useNotice } from '../node'
 import { Btn, Card, ErrorText, Field, Mono, Notice, Page, Soft, Title, errorText, useAction } from '../ui'
 
 const PAGE = 50
@@ -15,7 +15,7 @@ export default function Seguindo ({ active }) {
   const [loadError, setLoadError] = useState('')
   const [input, setInput] = useState('')
   const [localError, setLocalError] = useState('')
-  const [done, setDone] = useState('')
+  const [done, setDone] = useNotice()
   const add = useAction()
   const remove = useAction()
   const more = useAction()

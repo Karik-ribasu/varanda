@@ -16,6 +16,26 @@ export function useNode () {
   return useContext(NodeContext)
 }
 
+// A screen notice ('publicado', 'seguindo', ...) describes what the current
+// node did in one context of the screen (the post being answered, the sync
+// run; null when the screen has none). It is cleared when that node ends or
+// is replaced, or when the context changes, so it never outlives what it
+// describes. -> [text, set(text, context = the current one)]
+export function useNotice (context = null) {
+  const { epoch } = useContext(NodeContext)
+  const [notice, setNotice] = useState(null)
+  useEffect(() => {
+    setNotice((n) => (n !== null && (n.epoch !== epoch || n.context !== context) ? null : n))
+  }, [epoch, context])
+  // A handler keeps the epoch of the render that made it: a response that
+  // arrives after its node ended sets a notice that is never shown.
+  const set = useCallback((text, ctx = context) => {
+    setNotice(text ? { text, epoch, context: ctx } : null)
+  }, [epoch, context])
+  const shown = notice !== null && notice.epoch === epoch && notice.context === context ? notice.text : ''
+  return [shown, set]
+}
+
 const noConnection = () => Promise.reject(Object.assign(new Error('sem conexão com o nó'), { code: 'CLOSED' }))
 
 export function NodeProvider ({ children }) {
@@ -24,6 +44,8 @@ export function NodeProvider ({ children }) {
   const [config, setConfig] = useState(null)
   const [error, setError] = useState('')
   const [sync, setSync] = useState({ active: null, lines: [], stopped: null })
+  // Bumped when a connection starts and when one ends (useNotice).
+  const [epoch, setEpoch] = useState(0)
   const connRef = useRef(null)
   const startedRef = useRef(false)
   const busyRef = useRef(false)
@@ -50,6 +72,7 @@ export function NodeProvider ({ children }) {
     setPhase('connecting')
     setError('')
     setSync({ active: null, lines: [], stopped: null })
+    setEpoch((e) => e + 1)
     const holder = {}
     try {
       const conn = await connectNode(cfg, {
@@ -58,6 +81,7 @@ export function NodeProvider ({ children }) {
           if (connRef.current !== holder.conn) return
           connRef.current = null
           setSync({ active: null, lines: [], stopped: null })
+          setEpoch((e) => e + 1)
           setError(code === 4000 ? 'outra aba assumiu a conexão' : 'a conexão com o nó foi encerrada')
           setPhase('error')
         }
@@ -120,8 +144,8 @@ export function NodeProvider ({ children }) {
   }, [])
 
   const value = useMemo(() => ({
-    phase, config, error, sync, request, restart, reconnect, connect, canConfigure
-  }), [phase, config, error, sync, request, restart, reconnect, connect])
+    phase, config, error, sync, epoch, request, restart, reconnect, connect, canConfigure
+  }), [phase, config, error, sync, epoch, request, restart, reconnect, connect])
 
   return <NodeContext.Provider value={value}>{children}</NodeContext.Provider>
 }
