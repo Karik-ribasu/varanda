@@ -22,3 +22,5 @@ Ainda não há versões lançadas: todos os pacotes estão em `0.1.0` e nenhum f
 - Um lock do diretório de dados com o pid do próprio processo, deixado por um processo morto que tinha o mesmo pid
   (um contêiner reiniciado), agora é retomado em vez de travar o semeador. ([#34](https://github.com/Varanda-org/varanda/issues/34))
 - Liberação de referências a sockets fechados nas buscas em quarentena. ([#2](https://github.com/Varanda-org/varanda/pull/2))
+- DHT pública com endereço local de loopback: o app e a sessão do nó recusam a combinação, que só terminava em tempo esgotado.
+  Avisos de tela somem quando o nó encerra, quando a sincronização termina ou quando a resposta muda. ([#10](https://github.com/Varanda-org/varanda/issues/10))

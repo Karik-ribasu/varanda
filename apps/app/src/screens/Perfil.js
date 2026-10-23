@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { MAX_BIO, MAX_NAME } from '@varanda/rpc'
-import { useNode } from '../node'
+import { useNode, useNotice } from '../node'
 import { Btn, Card, ErrorText, Field, Notice, Page, Soft, Title, useAction } from '../ui'
 
 const count = (s) => Array.from(s).length
@@ -11,7 +11,7 @@ export default function Perfil () {
   const node = useNode()
   const [name, setName] = useState('')
   const [bio, setBio] = useState('')
-  const [done, setDone] = useState('')
+  const [done, setDone] = useNotice()
   const action = useAction()
   const nameLen = count(name)
   const bioLen = count(bio)

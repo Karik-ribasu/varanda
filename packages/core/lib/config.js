@@ -12,14 +12,19 @@ function validBootstrap (entry) {
   return String(port) === portText && Number.isSafeInteger(port) && port >= 1 && port <= 65535
 }
 
-// The host of a valid bootstrap entry is a loopback address: 'localhost'
-// (any case) or a dotted IPv4 address in 127.0.0.0/8.
-function isLoopbackBootstrap (entry) {
-  const text = String(entry)
-  const host = text.slice(0, text.lastIndexOf(':')).toLowerCase()
-  if (host === 'localhost') return true
-  const m = /^127\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$/.exec(host)
+// A loopback address: 'localhost' (any case), a dotted IPv4 address in
+// 127.0.0.0/8, or the IPv6 loopback ::1 (with or without brackets).
+function isLoopbackAddress (host) {
+  const text = String(host).toLowerCase()
+  if (text === 'localhost' || text === '::1' || text === '[::1]') return true
+  const m = /^127\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$/.exec(text)
   return m !== null && m.slice(1).every((octet) => Number(octet) <= 255)
 }
 
-module.exports = { validBootstrap, isLoopbackBootstrap }
+// The host of a valid bootstrap entry is a loopback address.
+function isLoopbackBootstrap (entry) {
+  const text = String(entry)
+  return isLoopbackAddress(text.slice(0, text.lastIndexOf(':')))
+}
+
+module.exports = { validBootstrap, isLoopbackAddress, isLoopbackBootstrap }

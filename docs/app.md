@@ -29,6 +29,8 @@ Só o app nativo tem essa tela. Ela pede:
 - como achar pares: uma lista de bootstrap (`host:porta`) ou o interruptor "DHT pública", que começa desligado;
 - opcionalmente, o endereço local da DHT.
 
+Com a DHT pública ligada, o endereço local da DHT não pode ser de loopback (`127.x.x.x`, `localhost`, `::1`): uma DHT presa ao próprio aparelho nunca alcança um par público. O formulário recusa com "com a DHT pública, apague o endereço local da DHT: ... só alcança este aparelho", e o nó recusa a mesma combinação. Uma configuração gravada antes dessa regra perde só esse endereço quando o app a lê.
+
 A DHT pública é uma escolha ativa da pessoa (opt-in). Sem bootstrap e sem o interruptor ligado, o nó não tem como achar pares. A configuração, que não é segredo, fica em `Documents/varanda-config.json`, fora do diretório de dados do nó, e só é gravada depois que o nó inicia com ela. A aba Conexão mostra a mesma configuração depois: dá para trocar o bootstrap ou a DHT pública (o nó reinicia), mas a associação fica só para leitura depois que a identidade existe.
 
 ### Na web: sem onboarding

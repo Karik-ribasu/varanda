@@ -334,6 +334,7 @@ test('refusals before listening', async (t) => {
     ['no bootstrap, no --public-dht', ['--data', m.dataDir, '--association', m.association, '--origin', ORIGIN], {}, /^uso: informe --bootstrap ou --public-dht\n/],
     ['both', [...memberArgs(m), '--public-dht', '--origin', ORIGIN], {}, /^uso: --bootstrap e --public-dht são exclusivos\n/],
     ['VARANDA_BOOTSTRAP with --public-dht', ['--data', m.dataDir, '--association', m.association, '--public-dht', '--origin', ORIGIN], { VARANDA_BOOTSTRAP: m.bootstrap.join(',') }, /^uso: --bootstrap e --public-dht são exclusivos\n/],
+    ['loopback --dht-host with --public-dht', ['--data', m.dataDir, '--association', m.association, '--public-dht', '--dht-host', '127.0.0.1', '--origin', ORIGIN], {}, /^uso: dht-host de loopback e DHT pública são exclusivos\n$/],
     ['no allowed origin', memberArgs(m), {}, /^uso: informe --origin ou --ui\n/],
     ['bad origin', [...memberArgs(m), '--origin', 'http://localhost:8081/'], {}, /^uso: origem inválida /],
     ['a fixed token is refused', [...memberArgs(m), '--origin', ORIGIN], { VARANDA_SERVE_TOKEN: 'T'.repeat(48) }, /^uso: VARANDA_SERVE_TOKEN não é aceito: o token é gerado a cada início\n/],

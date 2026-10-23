@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { displayText } from '@varanda/rpc'
-import { useNode } from '../node'
+import { useNode, useNotice } from '../node'
 import { Body, Btn, Card, ErrorText, Field, Label, Mono, Notice, Page, Soft, Title, errorText, useAction } from '../ui'
 
 export default function Identidade ({ active }) {
@@ -13,7 +13,7 @@ export default function Identidade ({ active }) {
   const [loadError, setLoadError] = useState('')
   const [certText, setCertText] = useState('')
   const [certLocal, setCertLocal] = useState('')
-  const [done, setDone] = useState('')
+  const [done, setDone] = useNotice()
   const create = useAction()
   const add = useAction()
 

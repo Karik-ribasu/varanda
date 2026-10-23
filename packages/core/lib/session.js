@@ -31,7 +31,7 @@ const { certForKey } = require('./cert')
 const { formatEvent, key8 } = require('./sync-format')
 const { safe } = require('./safe')
 const { UsageError } = require('./errors')
-const { validBootstrap, isLoopbackBootstrap } = require('./config')
+const { validBootstrap, isLoopbackAddress, isLoopbackBootstrap } = require('./config')
 
 const HEX64 = /^[0-9a-fA-F]{64}$/
 const LOCKED_MESSAGE = 'diretório de dados em uso'
@@ -136,6 +136,11 @@ function checkConfig ({ dataDir, association, bootstrap, dhtHost, allowPublicDht
   if (dhtHost !== null && dhtHost !== undefined) {
     if (typeof dhtHost !== 'string' || !dhtHost || /\s/.test(dhtHost)) throw new UsageError('dht-host inválido')
     host = dhtHost
+  }
+  // A DHT bound to loopback never reaches a public peer: with the public DHT
+  // the run would only time out (issue #10).
+  if (allowPublicDht && host !== null && isLoopbackAddress(host)) {
+    throw new UsageError('dht-host de loopback e DHT pública são exclusivos')
   }
   // A loopback DHT host disables firewall probing (lib/net.js createSwarm):
   // without it a local testnet is unreachable (V7).
