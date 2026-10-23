@@ -403,7 +403,7 @@ docker compose -f deploy/seeder/compose.yaml up -d
 curl -s http://127.0.0.1:8788/health
 ```
 
-`docker compose -f deploy/seeder/compose.yaml ps` mostra `(healthy)` depois de `seed ready`. Registros: `docker compose -f deploy/seeder/compose.yaml logs -f seeder`. Estado sem parar: `docker compose -f deploy/seeder/compose.yaml exec seeder node apps/cli/bin/varanda.js seed status`. Para `seed list` ou `seed drop`, pare antes (`stop`), rode com `run --rm seeder seed list` e suba de novo (`start`). Não use `run` com o serviço no ar: cada contêiner tem os próprios pids, e o lock do diretório não enxerga o processo do outro.
+`docker compose -f deploy/seeder/compose.yaml ps` mostra `(healthy)` depois de `seed ready`. Registros: `docker compose -f deploy/seeder/compose.yaml logs -f seeder`. Estado sem parar: `docker compose -f deploy/seeder/compose.yaml exec seeder node apps/cli/bin/varanda.js seed status`. Para `seed list` ou `seed drop`, pare antes (`stop`), rode com `run --rm seeder seed list` e suba de novo (`start`). Não use `run` com o serviço no ar: cada contêiner tem os próprios pids, e o lock do diretório não enxerga o processo do outro. O lock do RocksDB em `store/` ainda barra o segundo processo (`erro: File descriptor could not be locked`, nada é apagado), mas o `run` remove o `.varanda-lock` do semeador no ar, e `seed status` passa a dizer `parado` até ele reiniciar.
 
 ### systemd
 
